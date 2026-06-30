@@ -37,6 +37,7 @@ import {
   type ShippingOrder,
 } from "@/lib/shipping-types";
 import { loadData, saveData } from "@/lib/storage";
+import { seedDummyDataOnce } from "@/lib/seed-data";
 
 const STORAGE_KEY = "erp.shipping.orders";
 
@@ -56,6 +57,7 @@ function ShippingPage() {
   const [pasteText, setPasteText] = useState("");
 
   useEffect(() => {
+    seedDummyDataOnce();
     setOrders(loadData<ShippingOrder[]>(STORAGE_KEY, []));
   }, []);
 
