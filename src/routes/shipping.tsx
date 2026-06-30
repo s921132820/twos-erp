@@ -60,7 +60,15 @@ function ShippingPage() {
 
   useEffect(() => {
     seedDummyDataOnce();
-    setOrders(loadData<ShippingOrder[]>(STORAGE_KEY, []));
+    const raw = loadData<ShippingOrder[]>(STORAGE_KEY, []);
+    const migrated = raw.map((o) => ({
+      ...o,
+      freightGrade: (o.freightGrade ?? getFreightGrade(o.quantity)) as FreightGrade,
+    }));
+    setOrders(migrated);
+    if (migrated.length !== raw.length || migrated.some((o, i) => o.freightGrade !== raw[i].freightGrade)) {
+      saveData(STORAGE_KEY, migrated);
+    }
   }, []);
 
   const persist = (next: ShippingOrder[]) => {
