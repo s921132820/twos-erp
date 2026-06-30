@@ -56,6 +56,7 @@ function ShippingPage() {
   const [pasteText, setPasteText] = useState("");
 
   useEffect(() => {
+    seedDummyDataOnce();
     setOrders(loadData<ShippingOrder[]>(STORAGE_KEY, []));
   }, []);
 
