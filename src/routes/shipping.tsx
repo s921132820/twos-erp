@@ -32,7 +32,9 @@ import {
 } from "@/components/ui/table";
 import {
   emptyOrder,
+  getFreightGrade,
   parsePastedText,
+  type FreightGrade,
   type FreightType,
   type ShippingOrder,
 } from "@/lib/shipping-types";
@@ -58,7 +60,15 @@ function ShippingPage() {
 
   useEffect(() => {
     seedDummyDataOnce();
-    setOrders(loadData<ShippingOrder[]>(STORAGE_KEY, []));
+    const raw = loadData<ShippingOrder[]>(STORAGE_KEY, []);
+    const migrated = raw.map((o) => ({
+      ...o,
+      freightGrade: (o.freightGrade ?? getFreightGrade(o.quantity)) as FreightGrade,
+    }));
+    setOrders(migrated);
+    if (migrated.length !== raw.length || migrated.some((o, i) => o.freightGrade !== raw[i].freightGrade)) {
+      saveData(STORAGE_KEY, migrated);
+    }
   }, []);
 
   const persist = (next: ShippingOrder[]) => {
@@ -125,16 +135,17 @@ function ShippingPage() {
       주소: o.address,
       전화번호: o.phone,
       휴대폰번호: o.mobile,
-      택배수량: o.quantity,
+      중량kg: o.quantity,
       물품명: o.itemName,
       배송메세지: o.message,
       운임타입: o.freightType,
+      운임등급: o.freightGrade,
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
     ws["!cols"] = [
       { wch: 6 }, { wch: 20 }, { wch: 10 }, { wch: 10 },
       { wch: 40 }, { wch: 14 }, { wch: 14 }, { wch: 8 },
-      { wch: 20 }, { wch: 24 }, { wch: 10 },
+      { wch: 20 }, { wch: 24 }, { wch: 10 }, { wch: 8 },
     ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "택배발주");
@@ -244,13 +255,19 @@ function ShippingPage() {
                   onChange={(e) => updateField("itemName", e.target.value)}
                 />
               </Field>
-              <Field label="택배수량">
+              <Field label="중량(kg)">
                 <Input
                   type="number"
                   min={1}
                   value={form.quantity}
-                  onChange={(e) => updateField("quantity", parseInt(e.target.value, 10) || 1)}
+                  onChange={(e) => {
+                    const kg = parseInt(e.target.value, 10) || 1;
+                    setForm((f) => ({ ...f, quantity: kg, freightGrade: getFreightGrade(kg) }));
+                  }}
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  운임등급: <span className="font-semibold text-foreground">{form.freightGrade}</span>
+                </p>
               </Field>
               <Field label="배송메세지" className="md:col-span-2">
                 <Input
@@ -312,10 +329,11 @@ function ShippingPage() {
                     <TableHead>주소</TableHead>
                     <TableHead>전화</TableHead>
                     <TableHead>휴대폰</TableHead>
-                    <TableHead className="text-right">수량</TableHead>
+                    <TableHead className="text-right">중량(kg)</TableHead>
                     <TableHead>물품명</TableHead>
                     <TableHead>메세지</TableHead>
                     <TableHead>운임</TableHead>
+                    <TableHead>등급</TableHead>
                     <TableHead className="w-12" />
                   </TableRow>
                 </TableHeader>
@@ -335,6 +353,7 @@ function ShippingPage() {
                         {o.message}
                       </TableCell>
                       <TableCell>{o.freightType}</TableCell>
+                      <TableCell className="font-semibold">{o.freightGrade}</TableCell>
                       <TableCell>
                         <Button
                           size="icon"

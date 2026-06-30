@@ -1,4 +1,5 @@
 export type FreightType = "선불" | "착불" | "신용";
+export type FreightGrade = "A" | "C" | "D" | "E";
 
 export interface ShippingOrder {
   id: string;
@@ -8,10 +9,18 @@ export interface ShippingOrder {
   address: string;
   phone: string;
   mobile: string;
-  quantity: number;
+  quantity: number; // 중량(kg)
   itemName: string;
   message: string;
   freightType: FreightType;
+  freightGrade: FreightGrade;
+}
+
+export function getFreightGrade(kg: number): FreightGrade {
+  if (kg >= 20) return "E";
+  if (kg >= 15) return "D";
+  if (kg >= 10) return "C";
+  return "A";
 }
 
 export const emptyOrder = (): Omit<ShippingOrder, "id" | "createdAt"> => ({
@@ -24,6 +33,7 @@ export const emptyOrder = (): Omit<ShippingOrder, "id" | "createdAt"> => ({
   itemName: "",
   message: "",
   freightType: "선불",
+  freightGrade: "A",
 });
 
 /**

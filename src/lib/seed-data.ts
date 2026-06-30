@@ -1,4 +1,4 @@
-import type { ShippingOrder } from "./shipping-types";
+import { getFreightGrade, type ShippingOrder } from "./shipping-types";
 import { loadData, saveData } from "./storage";
 
 const SEED_FLAG = "erp.seeded.v1";
@@ -63,10 +63,11 @@ export function seedDummyDataOnce() {
         address: "서울시 강남구 역삼동 123-45",
         phone: "02-1234-5678",
         mobile: "010-1111-2222",
-        quantity: 1,
+        quantity: 8,
         itemName: "A4 복사용지",
         message: "문 앞에 놓아주세요",
         freightType: "선불",
+        freightGrade: getFreightGrade(8),
       },
       {
         id: crypto.randomUUID(),
@@ -76,10 +77,11 @@ export function seedDummyDataOnce() {
         address: "경기도 성남시 분당구 정자동 178",
         phone: "031-222-3333",
         mobile: "010-3333-4444",
-        quantity: 2,
+        quantity: 12,
         itemName: "토너 카트리지",
         message: "부재시 경비실",
         freightType: "착불",
+        freightGrade: getFreightGrade(12),
       },
       {
         id: crypto.randomUUID(),
@@ -89,10 +91,11 @@ export function seedDummyDataOnce() {
         address: "부산광역시 해운대구 우동 1500",
         phone: "051-444-5555",
         mobile: "010-5555-6666",
-        quantity: 5,
+        quantity: 17,
         itemName: "포장 박스 중",
         message: "",
         freightType: "신용",
+        freightGrade: getFreightGrade(17),
       },
       {
         id: crypto.randomUUID(),
@@ -102,10 +105,11 @@ export function seedDummyDataOnce() {
         address: "대전광역시 유성구 대학로 99",
         phone: "042-666-7777",
         mobile: "010-7777-8888",
-        quantity: 3,
+        quantity: 23,
         itemName: "볼펜 검정",
         message: "안전하게 부탁드립니다",
         freightType: "선불",
+        freightGrade: getFreightGrade(23),
       },
     ];
     saveData("erp.shipping.orders", seedOrders);
