@@ -23,6 +23,14 @@ export function getFreightGrade(kg: number): FreightGrade {
   return "A";
 }
 
+export const FREIGHT_PRICES: Record<FreightGrade, number> = {
+  A: 3670,
+  C: 4270,
+  D: 5170,
+  E: 5200,
+};
+
+
 export const emptyOrder = (): Omit<ShippingOrder, "id" | "createdAt"> => ({
   recipientName: "",
   zipCode: "",
