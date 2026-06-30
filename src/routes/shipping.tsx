@@ -254,13 +254,19 @@ function ShippingPage() {
                   onChange={(e) => updateField("itemName", e.target.value)}
                 />
               </Field>
-              <Field label="택배수량">
+              <Field label="중량(kg)">
                 <Input
                   type="number"
                   min={1}
                   value={form.quantity}
-                  onChange={(e) => updateField("quantity", parseInt(e.target.value, 10) || 1)}
+                  onChange={(e) => {
+                    const kg = parseInt(e.target.value, 10) || 1;
+                    setForm((f) => ({ ...f, quantity: kg, freightGrade: getFreightGrade(kg) }));
+                  }}
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  운임등급: <span className="font-semibold text-foreground">{form.freightGrade}</span>
+                </p>
               </Field>
               <Field label="배송메세지" className="md:col-span-2">
                 <Input
