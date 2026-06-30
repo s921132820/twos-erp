@@ -328,10 +328,11 @@ function ShippingPage() {
                     <TableHead>주소</TableHead>
                     <TableHead>전화</TableHead>
                     <TableHead>휴대폰</TableHead>
-                    <TableHead className="text-right">수량</TableHead>
+                    <TableHead className="text-right">중량(kg)</TableHead>
                     <TableHead>물품명</TableHead>
                     <TableHead>메세지</TableHead>
                     <TableHead>운임</TableHead>
+                    <TableHead>등급</TableHead>
                     <TableHead className="w-12" />
                   </TableRow>
                 </TableHeader>
