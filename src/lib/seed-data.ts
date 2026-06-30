@@ -1,4 +1,4 @@
-import type { ShippingOrder } from "./shipping-types";
+import { getFreightGrade, type ShippingOrder } from "./shipping-types";
 import { loadData, saveData } from "./storage";
 
 const SEED_FLAG = "erp.seeded.v1";
