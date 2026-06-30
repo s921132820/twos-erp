@@ -129,31 +129,48 @@ function ShippingPage() {
       toast.warning("내보낼 발주가 없습니다.");
       return;
     }
-    const rows = orders.map((o, i) => ({
-      번호: i + 1,
-      등록일시: new Date(o.createdAt).toLocaleString("ko-KR"),
+    const rows = orders.map((o) => ({
       수화인명: o.recipientName,
       우편번호: o.zipCode,
       주소: o.address,
       전화번호: o.phone,
       휴대폰번호: o.mobile,
-      중량kg: o.quantity,
+      택배수량: 1,
+      택배운임가격: FREIGHT_PRICES[o.freightGrade],
+      선착불: "",
       물품명: o.itemName,
+      "": "",
       배송메세지: o.message,
-      운임타입: o.freightType,
-      운임등급: o.freightGrade,
+      "택배 운임타입": o.freightGrade,
     }));
-    const ws = XLSX.utils.json_to_sheet(rows);
+    const ws = XLSX.utils.json_to_sheet(rows, {
+      header: [
+        "수화인명", "우편번호", "주소", "전화번호", "휴대폰번호",
+        "택배수량", "택배운임가격", "선착불", "물품명", "",
+        "배송메세지", "택배 운임타입",
+      ],
+    });
     ws["!cols"] = [
-      { wch: 6 }, { wch: 20 }, { wch: 10 }, { wch: 10 },
-      { wch: 40 }, { wch: 14 }, { wch: 14 }, { wch: 8 },
-      { wch: 20 }, { wch: 24 }, { wch: 10 }, { wch: 8 },
+      { wch: 16 }, { wch: 10 }, { wch: 50 }, { wch: 16 }, { wch: 16 },
+      { wch: 8 }, { wch: 12 }, { wch: 8 }, { wch: 40 }, { wch: 6 },
+      { wch: 30 }, { wch: 10 },
     ];
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "택배발주");
-    const today = new Date().toISOString().slice(0, 10);
-    XLSX.writeFile(wb, `택배발주_${today}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+
+    // 송장가격 시트
+    const priceRows = (Object.keys(FREIGHT_PRICES) as FreightGrade[]).map((g) => ({
+      택배크기: g,
+      택배가격: FREIGHT_PRICES[g],
+    }));
+    const ws2 = XLSX.utils.json_to_sheet(priceRows);
+    ws2["!cols"] = [{ wch: 10 }, { wch: 10 }];
+    XLSX.utils.book_append_sheet(wb, ws2, "송장가격");
+
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    XLSX.writeFile(wb, `${today}-_송장서식.xlsx`);
   };
+
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
