@@ -352,6 +352,7 @@ function ShippingPage() {
                         {o.message}
                       </TableCell>
                       <TableCell>{o.freightType}</TableCell>
+                      <TableCell className="font-semibold">{o.freightGrade}</TableCell>
                       <TableCell>
                         <Button
                           size="icon"
