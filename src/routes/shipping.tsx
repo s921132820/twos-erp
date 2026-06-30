@@ -32,7 +32,9 @@ import {
 } from "@/components/ui/table";
 import {
   emptyOrder,
+  getFreightGrade,
   parsePastedText,
+  type FreightGrade,
   type FreightType,
   type ShippingOrder,
 } from "@/lib/shipping-types";
