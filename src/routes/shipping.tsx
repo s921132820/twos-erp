@@ -135,16 +135,17 @@ function ShippingPage() {
       주소: o.address,
       전화번호: o.phone,
       휴대폰번호: o.mobile,
-      택배수량: o.quantity,
+      중량kg: o.quantity,
       물품명: o.itemName,
       배송메세지: o.message,
       운임타입: o.freightType,
+      운임등급: o.freightGrade,
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
     ws["!cols"] = [
       { wch: 6 }, { wch: 20 }, { wch: 10 }, { wch: 10 },
       { wch: 40 }, { wch: 14 }, { wch: 14 }, { wch: 8 },
-      { wch: 20 }, { wch: 24 }, { wch: 10 },
+      { wch: 20 }, { wch: 24 }, { wch: 10 }, { wch: 8 },
     ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "택배발주");
