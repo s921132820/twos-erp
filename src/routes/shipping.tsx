@@ -37,6 +37,7 @@ import {
   type ShippingOrder,
 } from "@/lib/shipping-types";
 import { loadData, saveData } from "@/lib/storage";
+import { seedDummyDataOnce } from "@/lib/seed-data";
 
 const STORAGE_KEY = "erp.shipping.orders";
 

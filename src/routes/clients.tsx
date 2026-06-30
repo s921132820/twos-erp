@@ -22,6 +22,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { loadData, saveData } from "@/lib/storage";
+import { seedDummyDataOnce } from "@/lib/seed-data";
 
 interface Client {
   id: string;
@@ -58,6 +59,7 @@ function ClientsPage() {
   const [form, setForm] = useState(empty());
 
   useEffect(() => {
+    seedDummyDataOnce();
     setItems(loadData<Client[]>(STORAGE_KEY, []));
   }, []);
 

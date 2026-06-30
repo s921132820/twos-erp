@@ -22,6 +22,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { loadData, saveData } from "@/lib/storage";
+import { seedDummyDataOnce } from "@/lib/seed-data";
 
 interface Item {
   id: string;
@@ -58,6 +59,7 @@ function ItemsPage() {
   const [form, setForm] = useState(empty());
 
   useEffect(() => {
+    seedDummyDataOnce();
     setItems(loadData<Item[]>(STORAGE_KEY, []));
   }, []);
 
