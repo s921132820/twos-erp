@@ -34,10 +34,12 @@ import {
   emptyOrder,
   getFreightGrade,
   parsePastedText,
+  FREIGHT_PRICES,
   type FreightGrade,
   type FreightType,
   type ShippingOrder,
 } from "@/lib/shipping-types";
+
 import { loadData, saveData } from "@/lib/storage";
 import { seedDummyDataOnce } from "@/lib/seed-data";
 
