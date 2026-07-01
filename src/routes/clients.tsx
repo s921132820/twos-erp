@@ -97,8 +97,10 @@ function ClientsPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {items.length === 0 ? (
-            <div className="text-center text-sm text-muted-foreground py-12">등록된 거래처가 없습니다.</div>
+          {filtered.length === 0 ? (
+            <div className="text-center text-sm text-muted-foreground py-12">
+              {query.trim() ? "검색 결과가 없습니다." : "등록된 거래처가 없습니다."}
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
@@ -114,7 +116,7 @@ function ClientsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {items.map((c) => (
+                  {filtered.map((c) => (
                     <TableRow key={c.id}>
                       <TableCell className="font-medium">{c.name}</TableCell>
                       <TableCell>{c.businessNumber}</TableCell>
