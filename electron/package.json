@@ -1,0 +1,25 @@
+{
+  "name": "twos-erp-electron",
+  "private": true,
+  "version": "0.1.0",
+  "main": "dist/main.js",
+  "scripts": {
+    "dev": "electron .",
+    "build": "tsc -p tsconfig.json",
+    "start": "electron .",
+    "lint": "eslint . --ext .ts,.tsx",
+    "format": "prettier --write ."
+  },
+  "dependencies": {
+    "dotenv": "^16.4.3"
+  },
+  "devDependencies": {
+    "@types/electron": "^27.0.0",
+    "@types/node": "^22.20.0",
+    "electron": "^27.0.0",
+    "electron-builder": "^24.6.0",
+    "eslint": "^9.39.4",
+    "prettier": "^3.9.4",
+    "typescript": "^5.9.3"
+  }
+}
