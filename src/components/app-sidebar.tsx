@@ -1,4 +1,7 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Building2, Package, Truck } from "lucide-react";
 
 import {
@@ -20,9 +23,7 @@ const items = [
 ];
 
 export function AppSidebar() {
-  const currentPath = useRouterState({
-    select: (router) => router.location.pathname,
-  });
+  const currentPath = usePathname();
 
   return (
     <Sidebar collapsible="icon">
@@ -44,7 +45,7 @@ export function AppSidebar() {
                 return (
                   <SidebarMenuItem key={item.url}>
                     <SidebarMenuButton asChild isActive={active}>
-                      <Link to={item.url} className="flex items-center gap-2">
+                      <Link href={item.url} className="flex items-center gap-2">
                         <item.icon className="h-4 w-4" />
                         <span>{item.title}</span>
                       </Link>

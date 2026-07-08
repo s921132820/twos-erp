@@ -1,4 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
+"use client";
+
 import { useEffect, useState } from "react";
 import * as XLSX from "xlsx";
 import { Download, Plus, Trash2, ClipboardPaste } from "lucide-react";
@@ -39,23 +40,12 @@ import {
   type FreightType,
   type ShippingOrder,
 } from "@/lib/shipping-types";
-
 import { loadData, saveData } from "@/lib/storage";
 import { seedDummyDataOnce } from "@/lib/seed-data";
 
 const STORAGE_KEY = "erp.shipping.orders";
 
-export const Route = createFileRoute("/shipping")({
-  head: () => ({
-    meta: [
-      { title: "택배 발주 관리 — 사내 ERP" },
-      { name: "description", content: "택배 발주 입력 및 엑셀 다운로드" },
-    ],
-  }),
-  component: ShippingPage,
-});
-
-function ShippingPage() {
+export default function ShippingPage() {
   const [orders, setOrders] = useState<ShippingOrder[]>([]);
   const [form, setForm] = useState(emptyOrder());
   const [pasteText, setPasteText] = useState("");
@@ -68,7 +58,10 @@ function ShippingPage() {
       freightGrade: (o.freightGrade ?? getFreightGrade(o.quantity)) as FreightGrade,
     }));
     setOrders(migrated);
-    if (migrated.length !== raw.length || migrated.some((o, i) => o.freightGrade !== raw[i].freightGrade)) {
+    if (
+      migrated.length !== raw.length ||
+      migrated.some((o, i) => o.freightGrade !== raw[i].freightGrade)
+    ) {
       saveData(STORAGE_KEY, migrated);
     }
   }, []);
@@ -145,20 +138,37 @@ function ShippingPage() {
     }));
     const ws = XLSX.utils.json_to_sheet(rows, {
       header: [
-        "수화인명", "우편번호", "주소", "전화번호", "휴대폰번호",
-        "택배수량", "택배운임가격", "선착불", "물품명", "",
-        "배송메세지", "택배 운임타입",
+        "수화인명",
+        "우편번호",
+        "주소",
+        "전화번호",
+        "휴대폰번호",
+        "택배수량",
+        "택배운임가격",
+        "선착불",
+        "물품명",
+        "",
+        "배송메세지",
+        "택배 운임타입",
       ],
     });
     ws["!cols"] = [
-      { wch: 16 }, { wch: 10 }, { wch: 50 }, { wch: 16 }, { wch: 16 },
-      { wch: 8 }, { wch: 12 }, { wch: 8 }, { wch: 40 }, { wch: 6 },
-      { wch: 30 }, { wch: 10 },
+      { wch: 16 },
+      { wch: 10 },
+      { wch: 50 },
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 8 },
+      { wch: 12 },
+      { wch: 8 },
+      { wch: 40 },
+      { wch: 6 },
+      { wch: 30 },
+      { wch: 10 },
     ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
 
-    // 송장가격 시트
     const priceRows = (Object.keys(FREIGHT_PRICES) as FreightGrade[]).map((g) => ({
       택배크기: g,
       택배가격: FREIGHT_PRICES[g],
@@ -170,7 +180,6 @@ function ShippingPage() {
     const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
     XLSX.writeFile(wb, `${today}-_송장서식.xlsx`);
   };
-
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -215,7 +224,9 @@ function ShippingPage() {
                   handlePasteArea(text);
                 }
               }}
-              placeholder={"예) 홍길동\t06236\t서울시 강남구...\t02-1234-5678\t010-1234-5678\t1\t사무용품\t문앞\t선불\n또는\n수화인명: 홍길동\n우편번호: 06236\n..."}
+              placeholder={
+                "예) 홍길동\t06236\t서울시 강남구...\t02-1234-5678\t010-1234-5678\t1\t사무용품\t문앞\t선불\n또는\n수화인명: 홍길동\n우편번호: 06236\n..."
+              }
               className="min-h-[200px] font-mono text-xs"
             />
             <Button
@@ -311,11 +322,7 @@ function ShippingPage() {
               </Field>
 
               <div className="md:col-span-2 flex gap-2 justify-end pt-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => setForm(emptyOrder())}
-                >
+                <Button type="button" variant="ghost" onClick={() => setForm(emptyOrder())}>
                   초기화
                 </Button>
                 <Button type="submit">
@@ -374,11 +381,7 @@ function ShippingPage() {
                       <TableCell>{o.freightType}</TableCell>
                       <TableCell className="font-semibold">{o.freightGrade}</TableCell>
                       <TableCell>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => handleDelete(o.id)}
-                        >
+                        <Button size="icon" variant="ghost" onClick={() => handleDelete(o.id)}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </TableCell>

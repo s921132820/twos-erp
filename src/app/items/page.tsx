@@ -1,4 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
+"use client";
+
 import { useEffect, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -44,17 +45,7 @@ const empty = (): Omit<Item, "id"> => ({
   memo: "",
 });
 
-export const Route = createFileRoute("/items")({
-  head: () => ({
-    meta: [
-      { title: "관리 품목 등록 — 사내 ERP" },
-      { name: "description", content: "관리 품목 등록 및 관리" },
-    ],
-  }),
-  component: ItemsPage,
-});
-
-function ItemsPage() {
+export default function ItemsPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [form, setForm] = useState(empty());
 
@@ -97,10 +88,17 @@ function ItemsPage() {
               <Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
             </FormItem>
             <FormItem label="품목명" required>
-              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+              <Input
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                required
+              />
             </FormItem>
             <FormItem label="분류">
-              <Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
+              <Input
+                value={form.category}
+                onChange={(e) => setForm({ ...form, category: e.target.value })}
+              />
             </FormItem>
             <FormItem label="단위">
               <Input value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} />
@@ -117,7 +115,10 @@ function ItemsPage() {
               <Input value={form.memo} onChange={(e) => setForm({ ...form, memo: e.target.value })} />
             </FormItem>
             <div className="md:col-span-2 flex justify-end">
-              <Button type="submit"><Plus className="h-4 w-4 mr-2" />등록</Button>
+              <Button type="submit">
+                <Plus className="h-4 w-4 mr-2" />
+                등록
+              </Button>
             </div>
           </form>
         </CardContent>
@@ -129,7 +130,9 @@ function ItemsPage() {
         </CardHeader>
         <CardContent>
           {items.length === 0 ? (
-            <div className="text-center text-sm text-muted-foreground py-12">등록된 품목이 없습니다.</div>
+            <div className="text-center text-sm text-muted-foreground py-12">
+              등록된 품목이 없습니다.
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
@@ -152,9 +155,15 @@ function ItemsPage() {
                       <TableCell>{it.category}</TableCell>
                       <TableCell>{it.unit}</TableCell>
                       <TableCell className="text-right">{it.price.toLocaleString("ko-KR")}</TableCell>
-                      <TableCell className="max-w-[200px] truncate" title={it.memo}>{it.memo}</TableCell>
+                      <TableCell className="max-w-[200px] truncate" title={it.memo}>
+                        {it.memo}
+                      </TableCell>
                       <TableCell>
-                        <Button size="icon" variant="ghost" onClick={() => persist(items.filter((x) => x.id !== it.id))}>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => persist(items.filter((x) => x.id !== it.id))}
+                        >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </TableCell>
@@ -170,11 +179,22 @@ function ItemsPage() {
   );
 }
 
-function FormItem({ label, required, className, children }: { label: string; required?: boolean; className?: string; children: React.ReactNode }) {
+function FormItem({
+  label,
+  required,
+  className,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  className?: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className={className}>
       <Label className="text-xs font-medium text-muted-foreground">
-        {label}{required && <span className="text-destructive ml-0.5">*</span>}
+        {label}
+        {required && <span className="text-destructive ml-0.5">*</span>}
       </Label>
       <div className="mt-1.5">{children}</div>
     </div>

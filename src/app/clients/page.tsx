@@ -1,14 +1,11 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+"use client";
+
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Search, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -33,17 +30,7 @@ interface Client {
 
 const STORAGE_KEY = "erp.clients";
 
-export const Route = createFileRoute("/clients")({
-  head: () => ({
-    meta: [
-      { title: "거래처 관리 — 사내 ERP" },
-      { name: "description", content: "거래처 목록 및 관리" },
-    ],
-  }),
-  component: ClientsPage,
-});
-
-function ClientsPage() {
+export default function ClientsPage() {
   const [items, setItems] = useState<Client[]>([]);
   const [query, setQuery] = useState("");
 
@@ -67,7 +54,7 @@ function ClientsPage() {
         c.contact.toLowerCase().includes(q) ||
         c.phone.toLowerCase().includes(q) ||
         c.address.toLowerCase().includes(q) ||
-        c.memo.toLowerCase().includes(q)
+        c.memo.toLowerCase().includes(q),
     );
   }, [items, query]);
 
@@ -79,7 +66,10 @@ function ClientsPage() {
           <p className="text-sm text-muted-foreground mt-1">등록된 거래처를 확인하고 관리합니다.</p>
         </div>
         <Button asChild>
-          <Link to="/clients/new"><Plus className="h-4 w-4 mr-2" />거래처 등록</Link>
+          <Link href="/clients/new">
+            <Plus className="h-4 w-4 mr-2" />
+            거래처 등록
+          </Link>
         </Button>
       </div>
 
@@ -122,10 +112,18 @@ function ClientsPage() {
                       <TableCell>{c.businessNumber}</TableCell>
                       <TableCell>{c.contact}</TableCell>
                       <TableCell>{c.phone}</TableCell>
-                      <TableCell className="max-w-[260px] truncate" title={c.address}>{c.address}</TableCell>
-                      <TableCell className="max-w-[180px] truncate" title={c.memo}>{c.memo}</TableCell>
+                      <TableCell className="max-w-[260px] truncate" title={c.address}>
+                        {c.address}
+                      </TableCell>
+                      <TableCell className="max-w-[180px] truncate" title={c.memo}>
+                        {c.memo}
+                      </TableCell>
                       <TableCell>
-                        <Button size="icon" variant="ghost" onClick={() => persist(items.filter((x) => x.id !== c.id))}>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => persist(items.filter((x) => x.id !== c.id))}
+                        >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </TableCell>
