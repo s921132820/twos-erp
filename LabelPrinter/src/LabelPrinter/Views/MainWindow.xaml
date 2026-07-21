@@ -17,14 +17,22 @@
         </Grid.RowDefinitions>
 
         <Border Padding="28,22" Background="White">
-            <StackPanel>
-                <TextBlock FontSize="24"
-                           FontWeight="Bold"
-                           Text="수입축산물 라벨 출력" />
-                <TextBlock Margin="0,6,0,0"
-                           Foreground="{StaticResource MutedTextBrush}"
-                           Text="품목과 수량을 선택한 후 출력하세요." />
-            </StackPanel>
+            <Grid>
+                <StackPanel>
+                    <TextBlock FontSize="24"
+                               FontWeight="Bold"
+                               Text="수입축산물 라벨 출력" />
+                    <TextBlock Margin="0,6,0,0"
+                               Foreground="{StaticResource MutedTextBrush}"
+                               Text="품목과 수량을 선택한 후 출력하세요." />
+                </StackPanel>
+                <Button HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Padding="14,8"
+                        Click="SettingsButton_OnClick"
+                        Content="출력 설정"
+                        Cursor="Hand" />
+            </Grid>
         </Border>
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
@@ -84,19 +92,23 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
 
-                        <TextBlock Grid.Row="0" FontWeight="SemiBold" Text="원산지" />
-                        <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding OriginCountry}" />
+                        <TextBlock Grid.Row="0" FontWeight="SemiBold" Text="라벨명" />
+                        <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding LabelName}" />
 
-                        <TextBlock Grid.Row="1" Margin="0,16,0,0" FontWeight="SemiBold" Text="유통기한" />
-                        <TextBlock Grid.Row="1" Grid.Column="1" Margin="0,16,0,0" Text="{Binding ExpirationDate}" />
+                        <TextBlock Grid.Row="1" Margin="0,16,0,0" FontWeight="SemiBold" Text="원산지" />
+                        <TextBlock Grid.Row="1" Grid.Column="1" Margin="0,16,0,0" Text="{Binding OriginCountry}" />
 
-                        <TextBlock Grid.Row="2" Margin="0,16,0,0" FontWeight="SemiBold" Text="이력번호" />
-                        <TextBlock Grid.Row="2" Grid.Column="1" Margin="0,16,0,0" Text="{Binding TraceNumber}" />
+                        <TextBlock Grid.Row="2" Margin="0,16,0,0" FontWeight="SemiBold" Text="유통기한" />
+                        <TextBlock Grid.Row="2" Grid.Column="1" Margin="0,16,0,0" Text="{Binding ExpirationDate}" />
 
-                        <TextBlock Grid.Row="3" Margin="0,16,0,0" FontWeight="SemiBold" Text="수입업체" />
-                        <TextBlock Grid.Row="3" Grid.Column="1" Margin="0,16,0,0" Text="{Binding ImporterName}" />
+                        <TextBlock Grid.Row="3" Margin="0,16,0,0" FontWeight="SemiBold" Text="이력번호" />
+                        <TextBlock Grid.Row="3" Grid.Column="1" Margin="0,16,0,0" Text="{Binding TraceNumber}" />
+
+                        <TextBlock Grid.Row="4" Margin="0,16,0,0" FontWeight="SemiBold" Text="수입업체" />
+                        <TextBlock Grid.Row="4" Grid.Column="1" Margin="0,16,0,0" Text="{Binding ImporterName}" />
                     </Grid>
                 </Border>
 
@@ -106,6 +118,7 @@
                            TextWrapping="Wrap" />
 
                 <Button Style="{StaticResource PrimaryButtonStyle}"
+                        Command="{Binding PrintCommand}"
                         Content="출력"
                         ToolTip="라벨 출력을 시작합니다." />
             </StackPanel>

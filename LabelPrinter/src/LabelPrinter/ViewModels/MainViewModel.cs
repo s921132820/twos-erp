@@ -2,7 +2,9 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using LabelPrinter.Api;
+using LabelPrinter.Helpers;
 using LabelPrinter.Models;
+using LabelPrinter.Printer;
 using LabelPrinter.Services;
 
 namespace LabelPrinter.ViewModels;
@@ -11,24 +13,38 @@ public sealed class MainViewModel : INotifyPropertyChanged
 {
     private readonly IProductService _productService;
     private readonly IMeatTraceService _meatTraceService;
+    private readonly ILabelDataService _labelDataService;
+    private readonly ILabelPrinter _labelPrinter;
+    private readonly IErrorHandler _errorHandler;
     private Product? _selectedProduct;
+    private LabelData? _currentLabelData;
     private string _printQuantity = "1";
     private string _originCountry = "-";
     private string _expirationDate = "-";
     private string _traceNumber = "-";
     private string _importerName = "-";
+    private string _labelName = "-";
     private string _statusMessage = "품목을 선택하고 출력 수량을 입력하세요.";
     private bool _isLoading;
 
     public MainViewModel(
         IProductService productService,
-        IMeatTraceService meatTraceService)
+        IMeatTraceService meatTraceService,
+        ILabelDataService labelDataService,
+        ILabelPrinter labelPrinter,
+        IErrorHandler errorHandler)
     {
         _productService = productService;
         _meatTraceService = meatTraceService;
+        _labelDataService = labelDataService;
+        _labelPrinter = labelPrinter;
+        _errorHandler = errorHandler;
+        PrintCommand = new AsyncRelayCommand(PrintAsync, CanPrint);
     }
 
     public ObservableCollection<Product> Products { get; } = [];
+
+    public AsyncRelayCommand PrintCommand { get; }
 
     public Product? SelectedProduct
     {
@@ -41,9 +57,13 @@ public sealed class MainViewModel : INotifyPropertyChanged
             }
 
             TraceNumber = value?.TraceNumber ?? "-";
+            LabelName = string.IsNullOrWhiteSpace(value?.LabelName)
+                ? value?.ProductName ?? "-"
+                : value.LabelName;
             OriginCountry = "-";
             ExpirationDate = "-";
             ImporterName = "-";
+            CurrentLabelData = null;
             StatusMessage = value is null
                 ? "품목을 선택하세요."
                 : $"{value.ProductName} 품목이 선택되었습니다.";
@@ -53,7 +73,20 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public string PrintQuantity
     {
         get => _printQuantity;
-        set => SetProperty(ref _printQuantity, value);
+        set
+        {
+            if (SetProperty(ref _printQuantity, value))
+            {
+                if (!string.IsNullOrWhiteSpace(value)
+                    && (!int.TryParse(value, out var quantity)
+                        || quantity is < PrintLimits.MinimumQuantity or > PrintLimits.MaximumQuantity))
+                {
+                    StatusMessage = $"출력 수량은 {PrintLimits.MinimumQuantity}~{PrintLimits.MaximumQuantity} 사이의 숫자로 입력하세요.";
+                }
+
+                PrintCommand.NotifyCanExecuteChanged();
+            }
+        }
     }
 
     public string OriginCountry
@@ -80,6 +113,24 @@ public sealed class MainViewModel : INotifyPropertyChanged
         set => SetProperty(ref _importerName, value);
     }
 
+    public string LabelName
+    {
+        get => _labelName;
+        set => SetProperty(ref _labelName, value);
+    }
+
+    public LabelData? CurrentLabelData
+    {
+        get => _currentLabelData;
+        private set
+        {
+            if (SetProperty(ref _currentLabelData, value))
+            {
+                PrintCommand.NotifyCanExecuteChanged();
+            }
+        }
+    }
+
     public string StatusMessage
     {
         get => _statusMessage;
@@ -94,6 +145,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
             if (SetProperty(ref _isLoading, value))
             {
                 OnPropertyChanged(nameof(IsNotLoading));
+                PrintCommand.NotifyCanExecuteChanged();
             }
         }
     }
@@ -128,9 +180,12 @@ public sealed class MainViewModel : INotifyPropertyChanged
         {
             StatusMessage = "품목 불러오기가 취소되었습니다.";
         }
-        catch (GoogleAppsScriptApiException exception)
+        catch (Exception exception)
         {
-            StatusMessage = exception.Message;
+            StatusMessage = await _errorHandler.HandleAsync(
+                exception,
+                "Google Spreadsheet 품목 조회",
+                cancellationToken);
         }
         finally
         {
@@ -161,21 +216,72 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 return;
             }
 
-            OriginCountry = traceInfo.OriginCountry;
-            ExpirationDate = string.IsNullOrWhiteSpace(traceInfo.ExpirationDate)
-                ? "API 제공 없음"
-                : traceInfo.ExpirationDate;
-            ImporterName = traceInfo.ImporterName;
-            TraceNumber = traceInfo.TraceNumber;
-            StatusMessage = "이력정보 조회가 완료되었습니다.";
+            var labelData = _labelDataService.Create(selectedProduct, traceInfo);
+            CurrentLabelData = labelData;
+            LabelName = labelData.LabelName;
+            OriginCountry = labelData.OriginCountry;
+            ExpirationDate = labelData.HasExpirationDate
+                ? labelData.ExpirationDate!
+                : "API 제공 없음";
+            ImporterName = labelData.ImporterName;
+            TraceNumber = labelData.TraceNumber;
+            StatusMessage = labelData.HasExpirationDate
+                ? "라벨 데이터 생성이 완료되었습니다."
+                : "라벨 데이터가 생성되었지만 API에 유통기한이 없습니다.";
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             StatusMessage = "이력정보 조회가 취소되었습니다.";
         }
-        catch (MeatWatchApiException exception)
+        catch (Exception exception)
         {
-            StatusMessage = exception.Message;
+            CurrentLabelData = null;
+            StatusMessage = await _errorHandler.HandleAsync(
+                exception,
+                "MeatWatch 이력 조회 및 라벨 데이터 생성",
+                cancellationToken);
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private bool CanPrint()
+    {
+        return !IsLoading
+            && CurrentLabelData is not null
+            && int.TryParse(PrintQuantity, out var quantity)
+            && quantity is >= PrintLimits.MinimumQuantity and <= PrintLimits.MaximumQuantity;
+    }
+
+    private async Task PrintAsync()
+    {
+        var labelData = CurrentLabelData;
+        if (labelData is null)
+        {
+            StatusMessage = "먼저 품목과 이력정보를 조회하세요.";
+            return;
+        }
+
+        if (!int.TryParse(PrintQuantity, out var quantity)
+            || quantity is < PrintLimits.MinimumQuantity or > PrintLimits.MaximumQuantity)
+        {
+            StatusMessage = $"출력 수량은 {PrintLimits.MinimumQuantity}~{PrintLimits.MaximumQuantity}장이어야 합니다.";
+            return;
+        }
+
+        IsLoading = true;
+        StatusMessage = "Windows 기본 프린터로 라벨을 전송하는 중입니다.";
+
+        try
+        {
+            var result = await _labelPrinter.PrintAsync(labelData, quantity);
+            StatusMessage = $"{result.PrinterName} 프린터로 {result.Quantity}장 출력했습니다.";
+        }
+        catch (Exception exception)
+        {
+            StatusMessage = await _errorHandler.HandleAsync(exception, "Windows 라벨 출력");
         }
         finally
         {
