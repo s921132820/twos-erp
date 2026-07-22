@@ -1,6 +1,10 @@
 import { PrismaClient } from "@prisma/client";
+import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 
-const prisma = new PrismaClient();
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) throw new Error("DATABASE_URL 환경변수가 설정되지 않았습니다.");
+
+const prisma = new PrismaClient({ adapter: new PrismaMariaDb(databaseUrl) });
 
 const products = [
   { code: "SOUP-001", name: "염소탕", category: "탕류", unit: "팩", description: "진하게 우려낸 염소탕" },

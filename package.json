@@ -2,6 +2,7 @@
   "name": "twosfood-erp",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@11.10.0",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -9,11 +10,12 @@
     "lint": "eslint .",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
-    "db:seed": "tsx prisma/seed.ts",
+    "db:seed": "prisma db seed",
     "db:studio": "prisma studio"
   },
   "dependencies": {
     "@hookform/resolvers": "latest",
+    "@prisma/adapter-mariadb": "^7.9.0",
     "@prisma/client": "latest",
     "@radix-ui/react-dialog": "latest",
     "@radix-ui/react-label": "latest",
@@ -21,6 +23,7 @@
     "@radix-ui/react-slot": "latest",
     "class-variance-authority": "latest",
     "clsx": "latest",
+    "dotenv": "^17.4.2",
     "lucide-react": "latest",
     "next": "latest",
     "react": "latest",
@@ -35,11 +38,11 @@
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
-    "eslint": "latest",
+    "eslint": "^9.39.0",
     "eslint-config-next": "latest",
     "prisma": "latest",
     "tailwindcss": "latest",
     "tsx": "latest",
-    "typescript": "latest"
+    "typescript": "^5.9.0"
   }
 }

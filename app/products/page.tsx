@@ -5,6 +5,8 @@ import { getProductCategories, getProducts } from "@/lib/products/queries";
 
 type SearchParams = Promise<{ query?: string; category?: string; active?: string }>;
 
+export const dynamic = "force-dynamic";
+
 export default async function ProductsPage({ searchParams }: { searchParams: SearchParams }) {
   const filters = await searchParams;
   const [products, categories] = await Promise.all([getProducts(filters), getProductCategories()]);

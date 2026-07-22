@@ -12,7 +12,7 @@
 ## 사전 준비
 
 - Node.js 24 LTS 권장(최소 버전은 설치된 Next.js의 `engines` 조건 참고)
-- npm 11 이상 권장
+- pnpm 11 이상 권장
 - MySQL 8.x 로컬 설치 및 실행
 
 ## 1. MySQL 데이터베이스 생성
@@ -43,13 +43,18 @@ DATABASE_URL="mysql://root:내비밀번호@localhost:3306/twosfood_erp"
 
 ## 3. 설치 및 DB 준비
 
-Windows PowerShell의 실행 정책 때문에 `npm` 실행이 차단되면 아래처럼 `npm.cmd`를 사용합니다.
+```powershell
+pnpm install
+pnpm db:generate
+pnpm db:migrate -- --name init
+pnpm db:seed
+```
+
+이 PC처럼 인증서 검사 오류가 발생하지만 보안 인증서가 Windows에 정상 등록되어 있다면, SSL 검증을 끄지 않고 다음처럼 시스템 CA를 사용해 설치할 수 있습니다.
 
 ```powershell
-npm.cmd install
-npm.cmd run db:generate
-npm.cmd run db:migrate -- --name init
-npm.cmd run db:seed
+$env:NODE_USE_SYSTEM_CA="1"
+pnpm install
 ```
 
 - `db:generate`: Prisma Client 생성
@@ -60,7 +65,7 @@ npm.cmd run db:seed
 ## 4. 개발 서버 실행
 
 ```powershell
-npm.cmd run dev
+pnpm dev
 ```
 
 브라우저에서 [http://localhost:3000](http://localhost:3000) 또는 [http://localhost:3000/products](http://localhost:3000/products)에 접속합니다. `/`는 `/products`로 자동 이동합니다. 서버를 끄려면 터미널에서 `Ctrl+C`를 누릅니다.
@@ -70,20 +75,20 @@ npm.cmd run dev
 ## 품질 확인 및 로컬 프로덕션 실행
 
 ```powershell
-npm.cmd run lint
-npm.cmd run build
-npm.cmd run start
+pnpm lint
+pnpm build
+pnpm start
 ```
 
 `start`는 `build` 성공 후 사용합니다.
 
-### npm 인증서 오류가 발생하는 경우
+### 패키지 저장소 인증서 오류가 발생하는 경우
 
-`UNABLE_TO_VERIFY_LEAF_SIGNATURE`가 표시되면 사내 보안 프로그램이나 프록시의 루트 인증서를 npm이 신뢰하지 못하는 상태입니다. 보안상 `strict-ssl=false`로 우회하지 말고, 조직 또는 보안 프로그램에서 제공한 CA 인증서 파일을 받아 다음처럼 등록한 뒤 다시 설치하세요.
+`UNABLE_TO_VERIFY_LEAF_SIGNATURE`가 표시되면 사내 보안 프로그램이나 프록시의 루트 인증서를 pnpm이 신뢰하지 못하는 상태입니다. 보안상 `strict-ssl=false`로 우회하지 말고, 조직 또는 보안 프로그램에서 제공한 CA 인증서 파일을 받아 다음처럼 등록한 뒤 다시 설치하세요.
 
 ```powershell
-npm.cmd config set cafile "C:\인증서경로\company-ca.pem"
-npm.cmd install
+pnpm config set cafile "C:\인증서경로\company-ca.pem"
+pnpm install
 ```
 
 ## 주요 폴더
