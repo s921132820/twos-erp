@@ -7,18 +7,18 @@ import { productSchema, type ProductFormState } from "@/lib/validations/product"
 
 function formValue(formData: FormData) {
   return {
+    id: formData.get("id"),
     code: formData.get("code"),
+    unit: formData.get("unit"),
+    description: formData.get("description"),
     name: formData.get("name"),
     category: formData.get("category"),
-    unit: formData.get("unit"),
-    description: formData.get("description") || undefined,
-    isActive: formData.get("isActive") === "on",
   };
 }
 
 function databaseError(error: unknown): ProductFormState {
   if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-    return { status: "error", message: "이미 사용 중인 품목코드입니다.", errors: { code: ["다른 품목코드를 입력해 주세요."] } };
+    return { status: "error", message: "제품 ID 또는 품목보고번호가 이미 사용 중입니다." };
   }
   console.error("Product database operation failed", error);
   return { status: "error", message: "처리 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요." };
@@ -36,8 +36,8 @@ export async function createProduct(_previous: ProductFormState, formData: FormD
   }
 }
 
-export async function updateProduct(id: number, _previous: ProductFormState, formData: FormData): Promise<ProductFormState> {
-  if (!Number.isInteger(id) || id < 1) return { status: "error", message: "수정할 제품 정보가 올바르지 않습니다." };
+export async function updateProduct(id: string, _previous: ProductFormState, formData: FormData): Promise<ProductFormState> {
+  if (!id) return { status: "error", message: "수정할 제품 정보가 올바르지 않습니다." };
   const parsed = productSchema.safeParse(formValue(formData));
   if (!parsed.success) return { status: "error", message: "입력 내용을 확인해 주세요.", errors: parsed.error.flatten().fieldErrors };
   try {
@@ -49,8 +49,8 @@ export async function updateProduct(id: number, _previous: ProductFormState, for
   }
 }
 
-export async function deleteProduct(id: number): Promise<{ success: boolean; message: string }> {
-  if (!Number.isInteger(id) || id < 1) return { success: false, message: "삭제할 제품 정보가 올바르지 않습니다." };
+export async function deleteProduct(id: string): Promise<{ success: boolean; message: string }> {
+  if (!id) return { success: false, message: "삭제할 제품 정보가 올바르지 않습니다." };
   try {
     await prisma.product.delete({ where: { id } });
     revalidatePath("/products");

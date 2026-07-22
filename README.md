@@ -15,14 +15,12 @@
 - pnpm 11 이상 권장
 - MySQL 8.x 로컬 설치 및 실행
 
-## 1. MySQL 데이터베이스 생성
+## 1. MySQL 데이터베이스 확인
 
-MySQL Workbench 또는 MySQL 명령줄에서 다음 SQL을 한 번 실행합니다.
+이 프로젝트는 기존 로컬 MySQL의 `twosfood.products` 테이블을 그대로 사용합니다. 별도 테이블이나 샘플 데이터를 생성하지 않습니다.
 
 ```sql
-CREATE DATABASE twosfood_erp
-  CHARACTER SET utf8mb4
-  COLLATE utf8mb4_unicode_ci;
+SELECT * FROM twosfood.products;
 ```
 
 ## 2. 환경변수 설정
@@ -36,7 +34,7 @@ Copy-Item .env.example .env
 `.env`를 열어 로컬 MySQL 계정에 맞게 수정합니다. 비밀번호에 `@`, `#`, `/` 같은 문자가 있으면 URL 인코딩해야 합니다.
 
 ```env
-DATABASE_URL="mysql://root:내비밀번호@localhost:3306/twosfood_erp"
+DATABASE_URL="mysql://root:내비밀번호@localhost:3306/twosfood"
 ```
 
 `.env`는 Git에서 제외되므로 실제 비밀번호를 `.env.example`이나 소스 코드에 적지 마세요.
@@ -46,8 +44,6 @@ DATABASE_URL="mysql://root:내비밀번호@localhost:3306/twosfood_erp"
 ```powershell
 pnpm install
 pnpm db:generate
-pnpm db:migrate -- --name init
-pnpm db:seed
 ```
 
 이 PC처럼 인증서 검사 오류가 발생하지만 보안 인증서가 Windows에 정상 등록되어 있다면, SSL 검증을 끄지 않고 다음처럼 시스템 CA를 사용해 설치할 수 있습니다.
@@ -58,8 +54,7 @@ pnpm install
 ```
 
 - `db:generate`: Prisma Client 생성
-- `db:migrate`: Product 테이블 생성 및 변경 이력 기록
-- `db:seed`: 염소탕, 갈비탕, 도가니탕, 우거지 소뼈해장국, LA갈비 추가
+- `db:migrate`: 향후 명시적인 DB 스키마 변경이 필요할 때만 사용
 - `db:studio`: 브라우저에서 로컬 DB 내용을 확인하는 Prisma Studio 실행
 
 ## 4. 개발 서버 실행

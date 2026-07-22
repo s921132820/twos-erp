@@ -3,18 +3,15 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
-export type ProductFilters = { query?: string; category?: string; active?: string };
+export type ProductFilters = { query?: string; category?: string };
 
 export async function getProducts(filters: ProductFilters) {
   const query = filters.query?.trim();
   const where: Prisma.ProductWhereInput = {
     ...(query
-      ? { OR: [{ code: { contains: query } }, { name: { contains: query } }] }
+      ? { OR: [{ id: { contains: query } }, { code: { contains: query } }, { name: { contains: query } }] }
       : {}),
     ...(filters.category ? { category: filters.category } : {}),
-    ...(filters.active === "true" || filters.active === "false"
-      ? { isActive: filters.active === "true" }
-      : {}),
   };
 
   return prisma.product.findMany({ where, orderBy: [{ createdAt: "desc" }, { id: "desc" }] });

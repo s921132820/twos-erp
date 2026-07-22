@@ -7,17 +7,14 @@ datasource db {
 }
 
 model Product {
-  id          Int      @id @default(autoincrement())
-  code        String   @unique @db.VarChar(50)
-  name        String   @db.VarChar(150)
-  category    String   @db.VarChar(80)
-  unit        String   @db.VarChar(30)
-  description String?  @db.Text
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id          String    @id @map("p_id") @db.VarChar(10)
+  code        String    @unique(map: "uk_report_number") @map("report_number") @db.VarChar(20)
+  unit        String    @map("product_type") @db.VarChar(50)
+  description String    @map("expiration_period") @db.VarChar(100)
+  name        String    @map("product_name") @db.VarChar(100)
+  category    String    @db.VarChar(50)
+  createdAt   DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt   DateTime? @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
 
-  @@index([name])
-  @@index([category])
-  @@index([isActive])
+  @@map("products")
 }

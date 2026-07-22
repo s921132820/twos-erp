@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { deleteProduct } from "@/app/products/actions";
 import { Button } from "@/components/ui/button";
 
-export function DeleteProductButton({ id, name }: { id: number; name: string }) {
+export function DeleteProductButton({ id, name }: { id: string; name: string }) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const remove = () => startTransition(async () => {
