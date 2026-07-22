@@ -14,7 +14,11 @@ export async function getProducts(filters: ProductFilters) {
     ...(filters.category ? { category: filters.category } : {}),
   };
 
-  return prisma.product.findMany({ where, orderBy: [{ createdAt: "desc" }, { id: "desc" }] });
+  return prisma.product.findMany({
+    where,
+    include: { importLivestockHistories: { orderBy: [{ importDate: "desc" }, { id: "desc" }] } },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+  });
 }
 
 export async function getProductCategories() {
