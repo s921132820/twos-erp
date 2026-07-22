@@ -1,7 +1,0 @@
-artifacts/
-.dotnet-cli/
-.nuget/
-**/bin/
-**/obj/
-*.user
-*.suo

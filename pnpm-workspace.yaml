@@ -1,8 +1,0 @@
-packages:
-  - 'electron'
-  - 'client'
-  - 'server'
-  - 'prisma'
-
-allowBuilds:
-  sharp: true
