@@ -12,6 +12,13 @@ function formValue(formData: FormData) {
     importDate: formData.get("importDate"),
     countryOfOrigin: formData.get("countryOfOrigin"),
     supplierName: formData.get("supplierName"),
+    itemName: formData.get("itemName") || undefined,
+    billOfLadingNumber: formData.get("billOfLadingNumber") || undefined,
+    exporterName: formData.get("exporterName") || undefined,
+    foreignSlaughterhouse: formData.get("foreignSlaughterhouse") || undefined,
+    foreignProcessingPlant: formData.get("foreignProcessingPlant") || undefined,
+    partNameCode: formData.get("partNameCode") || undefined,
+    foreignSlaughterDate: formData.get("foreignSlaughterDate") || undefined,
     memo: formData.get("memo") || undefined,
     isActive: formData.get("isActive") === "on",
   };
@@ -33,6 +40,7 @@ export async function createImportHistory(_previous: ImportHistoryFormState, for
   try {
     await prisma.importLivestockHistory.create({ data: parsed.data });
     revalidatePath("/products");
+    revalidatePath(`/products/${parsed.data.productId}/import-histories`);
     return { status: "success", message: "수입축산물 이력을 등록했습니다." };
   } catch (error) {
     return historyDatabaseError(error);
@@ -46,6 +54,7 @@ export async function updateImportHistory(id: number, _previous: ImportHistoryFo
   try {
     await prisma.importLivestockHistory.update({ where: { id }, data: parsed.data });
     revalidatePath("/products");
+    revalidatePath(`/products/${parsed.data.productId}/import-histories`);
     return { status: "success", message: "수입축산물 이력을 수정했습니다." };
   } catch (error) {
     return historyDatabaseError(error);
@@ -55,8 +64,9 @@ export async function updateImportHistory(id: number, _previous: ImportHistoryFo
 export async function deleteImportHistory(id: number): Promise<{ success: boolean; message: string }> {
   if (!Number.isInteger(id) || id < 1) return { success: false, message: "삭제할 이력 정보가 올바르지 않습니다." };
   try {
-    await prisma.importLivestockHistory.delete({ where: { id } });
+    const deleted = await prisma.importLivestockHistory.delete({ where: { id }, select: { productId: true } });
     revalidatePath("/products");
+    revalidatePath(`/products/${deleted.productId}/import-histories`);
     return { success: true, message: "수입축산물 이력을 삭제했습니다." };
   } catch (error) {
     console.error("Import livestock history delete failed", error);

@@ -19,17 +19,21 @@ export function ProductForm({ product, onSuccess, onCancel }: { product?: Produc
     defaultValues: {
       id: product?.id ?? "", code: product?.code ?? "", unit: product?.unit ?? "",
       description: product?.description ?? "", name: product?.name ?? "", category: product?.category ?? "",
+      material: product?.material ?? "",
     },
   });
   useEffect(() => { if (state.status === "success") onSuccess(state.message); }, [state, onSuccess]);
 
-  const submit = handleSubmit((_values, event) => {
-    const form = event?.currentTarget;
-    if (form instanceof HTMLFormElement) startTransition(() => formAction(new FormData(form)));
+  const submit = handleSubmit((values) => {
+    const formData = new FormData();
+    for (const [key, value] of Object.entries(values)) {
+      formData.set(key, value ?? "");
+    }
+    startTransition(() => formAction(formData));
   });
 
   return (
-    <form onSubmit={submit} className="space-y-5" noValidate>
+    <form onSubmit={submit} className="space-y-5" noValidate aria-busy={pending}>
       {state.status === "error" && <div role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700">{state.message}</div>}
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="text-sm font-medium text-slate-700">제품 ID <span className="text-red-500">*</span><Input {...register("id")} className="mt-1.5" maxLength={10} /><FieldError messages={state.errors?.id ?? (clientErrors.id?.message ? [clientErrors.id.message] : undefined)} /></label>
@@ -39,6 +43,7 @@ export function ProductForm({ product, onSuccess, onCancel }: { product?: Produc
         <label className="text-sm font-medium text-slate-700">제품유형 <span className="text-red-500">*</span><Input {...register("unit")} className="mt-1.5" maxLength={50} /><FieldError messages={state.errors?.unit ?? (clientErrors.unit?.message ? [clientErrors.unit.message] : undefined)} /></label>
         <label className="text-sm font-medium text-slate-700">소비기한 <span className="text-red-500">*</span><Input {...register("description")} className="mt-1.5" maxLength={100} /><FieldError messages={state.errors?.description ?? (clientErrors.description?.message ? [clientErrors.description.message] : undefined)} /></label>
       </div>
+      <label className="block text-sm font-medium text-slate-700">원료 및 함량<textarea {...register("material")} rows={5} maxLength={5000} placeholder="원료명과 함량을 입력해 주세요. 여러 줄로 입력할 수 있습니다." className="mt-1.5 w-full resize-y rounded-md border border-slate-300 bg-white p-3 text-sm outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100" /><FieldError messages={state.errors?.material ?? (clientErrors.material?.message ? [clientErrors.material.message] : undefined)} /></label>
       <div className="flex justify-end gap-2 border-t border-slate-200 pt-4"><Button type="button" variant="outline" onClick={onCancel}>취소</Button><Button type="submit" disabled={pending}>{pending ? "저장 중..." : product ? "수정 저장" : "제품 등록"}</Button></div>
     </form>
   );

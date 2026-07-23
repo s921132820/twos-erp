@@ -4,16 +4,19 @@ import { useCallback, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import type { Product } from "@prisma/client";
 import { Plus, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
 import { ProductForm } from "./product-form";
 
-export function ProductDialog({ product, trigger }: { product?: Product; trigger?: React.ReactNode }) {
+export function ProductDialog({ product }: { product?: Product; trigger?: React.ReactNode }) {
   const [open, setOpen] = useState(false);
-  const onSuccess = useCallback((message: string) => { setOpen(false); toast.success(message); }, []);
+  const router = useRouter();
+  const onSuccess = useCallback((message: string) => { setOpen(false); toast.success(message); router.refresh(); }, [router]);
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
-      <Dialog.Trigger asChild>{trigger ?? <Button><Plus size={17} />제품 등록</Button>}</Dialog.Trigger>
+      <Dialog.Trigger className={product ? "inline-flex h-8 items-center justify-center rounded-md px-3 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-100" : "inline-flex h-10 items-center justify-center gap-2 rounded-md bg-blue-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-blue-700"}>
+        {!product && <Plus size={17} />}{product ? "수정" : "제품 등록"}
+      </Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-slate-950/45" />
         <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl bg-white p-6 shadow-2xl focus:outline-none">

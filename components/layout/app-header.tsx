@@ -5,7 +5,13 @@ import { usePathname } from "next/navigation";
 
 export function AppHeader() {
   const pathname = usePathname();
-  const pageTitle = pathname.startsWith("/products") ? "우리 제품" : "홈";
+  const pageTitle = pathname.startsWith("/label-printer")
+    ? "라벨 프린터"
+    : pathname.includes("/import-histories")
+    ? "수입축산물 이력"
+    : pathname.startsWith("/products")
+      ? "우리 제품"
+      : "홈";
 
   return (
     <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-slate-200 bg-white px-6 lg:px-8">

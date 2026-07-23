@@ -13,6 +13,7 @@ function formValue(formData: FormData) {
     description: formData.get("description"),
     name: formData.get("name"),
     category: formData.get("category"),
+    material: formData.get("material") || undefined,
   };
 }
 
@@ -28,8 +29,9 @@ export async function createProduct(_previous: ProductFormState, formData: FormD
   const parsed = productSchema.safeParse(formValue(formData));
   if (!parsed.success) return { status: "error", message: "입력 내용을 확인해 주세요.", errors: parsed.error.flatten().fieldErrors };
   try {
-    await prisma.product.create({ data: parsed.data });
+    await prisma.product.create({ data: { ...parsed.data, material: parsed.data.material ?? null } });
     revalidatePath("/products");
+    revalidatePath("/label-printer");
     return { status: "success", message: "제품을 등록했습니다." };
   } catch (error) {
     return databaseError(error);
@@ -41,8 +43,9 @@ export async function updateProduct(id: string, _previous: ProductFormState, for
   const parsed = productSchema.safeParse(formValue(formData));
   if (!parsed.success) return { status: "error", message: "입력 내용을 확인해 주세요.", errors: parsed.error.flatten().fieldErrors };
   try {
-    await prisma.product.update({ where: { id }, data: parsed.data });
+    await prisma.product.update({ where: { id }, data: { ...parsed.data, material: parsed.data.material ?? null } });
     revalidatePath("/products");
+    revalidatePath("/label-printer");
     return { status: "success", message: "제품 정보를 수정했습니다." };
   } catch (error) {
     return databaseError(error);

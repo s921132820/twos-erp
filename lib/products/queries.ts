@@ -25,3 +25,14 @@ export async function getProductCategories() {
   const rows = await prisma.product.findMany({ distinct: ["category"], select: { category: true }, orderBy: { category: "asc" } });
   return rows.map((row) => row.category);
 }
+
+export async function getProductWithImportHistories(productId: string) {
+  return prisma.product.findUnique({
+    where: { id: productId },
+    include: {
+      importLivestockHistories: {
+        orderBy: [{ importDate: "desc" }, { id: "desc" }],
+      },
+    },
+  });
+}

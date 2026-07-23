@@ -13,6 +13,7 @@ model Product {
   description String    @map("expiration_period") @db.VarChar(100)
   name        String    @map("product_name") @db.VarChar(100)
   category    String    @db.VarChar(50)
+  material    String?   @db.Text
   createdAt   DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt   DateTime? @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
   importLivestockHistories ImportLivestockHistory[]
@@ -27,6 +28,13 @@ model ImportLivestockHistory {
   importDate      DateTime  @map("import_date") @db.Date
   countryOfOrigin String    @map("country_of_origin") @db.VarChar(100)
   supplierName    String    @map("supplier_name") @db.VarChar(150)
+  itemName        String?   @map("item_name") @db.VarChar(200)
+  billOfLadingNumber String? @map("bill_of_lading_number") @db.VarChar(100)
+  exporterName    String?   @map("exporter_name") @db.VarChar(200)
+  foreignSlaughterhouse String? @map("foreign_slaughterhouse") @db.VarChar(500)
+  foreignProcessingPlant String? @map("foreign_processing_plant") @db.VarChar(500)
+  partNameCode    String?   @map("part_name_code") @db.VarChar(200)
+  foreignSlaughterDate DateTime? @map("foreign_slaughter_date") @db.Date
   memo            String?   @db.Text
   isActive        Boolean   @default(true) @map("is_active")
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamp(0)

@@ -3,6 +3,9 @@ import { z } from "zod";
 const required = (label: string, max: number) =>
   z.string().trim().min(1, `${label}을(를) 입력해 주세요.`).max(max, `${label}은(는) ${max}자 이하여야 합니다.`);
 
+const optional = (label: string, max: number) =>
+  z.string().trim().max(max, `${label}은(는) ${max}자 이하여야 합니다.`).optional();
+
 export const productSchema = z.object({
   id: required("제품 ID", 10),
   code: required("품목보고번호", 20),
@@ -10,6 +13,7 @@ export const productSchema = z.object({
   description: required("소비기한", 100),
   name: required("제품명", 100),
   category: required("카테고리", 50),
+  material: optional("원료 및 함량", 5000),
 });
 
 export type ProductInput = z.infer<typeof productSchema>;
