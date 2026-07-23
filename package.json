@@ -29,6 +29,7 @@
     "lucide-react": "latest",
     "mariadb": "^3.5.3",
     "next": "latest",
+    "qz-tray": "^2.2.6",
     "react": "latest",
     "react-dom": "latest",
     "react-hook-form": "latest",

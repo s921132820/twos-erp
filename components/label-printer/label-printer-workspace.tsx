@@ -3,8 +3,11 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import JsBarcode from "jsbarcode";
 import { AlertTriangle, PackageSearch, Printer, Search } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { createBoxLabelTspl } from "@/lib/printing/box-label-tspl";
+import { listQzPrinters, printTspl } from "@/lib/printing/qz-client";
 import { cn } from "@/lib/utils";
 
 type LabelProduct = {
@@ -57,6 +60,24 @@ function shortDate(value: string) {
   return value ? value.slice(2).replaceAll("-", ".") : "";
 }
 
+function downloadFile(name: string, blob: Blob) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  link.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function bitmapHexDump(bitmap: Uint8Array, widthBytes: number) {
+  const lines: string[] = [];
+  for (let offset = 0; offset < bitmap.length; offset += widthBytes) {
+    const row = bitmap.subarray(offset, offset + widthBytes);
+    lines.push(`${String(offset / widthBytes).padStart(4, "0")}: ${Array.from(row, (value) => value.toString(16).padStart(2, "0")).join(" ")}`);
+  }
+  return lines.join("\n");
+}
+
 function Barcode({ value }: { value: string }) {
   const ref = useRef<SVGSVGElement>(null);
   useEffect(() => {
@@ -80,7 +101,7 @@ function BoxLabel({ product, today }: { product: LabelProduct | null; today: str
   const expirationDate = addMonths(history?.foreignSlaughterDate ?? null, 24);
 
   return (
-    <article className="print-label" aria-label="박스라벨 20kg 미리보기">
+    <article className="box-label-preview" aria-label="박스라벨 20kg 미리보기">
       <div className="label-top-grid">
         <div className="label-product-name">{product?.name || "제품명"}</div>
         <div className="label-storage">냉동</div>
@@ -116,72 +137,94 @@ export function LabelPrinterWorkspace() {
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState("");
   const [printing, setPrinting] = useState(false);
+  const [checkingPrinter, setCheckingPrinter] = useState(false);
+  const [savingDebug, setSavingDebug] = useState(false);
+  const [printerName, setPrinterName] = useState("TSC MB240");
+  const [printers, setPrinters] = useState<string[]>([]);
+  const [density, setDensity] = useState(6);
+  const [speed, setSpeed] = useState(3);
   const printInProgress = useRef(false);
   const today = dateInSeoul();
 
-  const printOneLabel = () => {
+  const checkPrinter = async () => {
+    setCheckingPrinter(true);
+    try {
+      const found = await listQzPrinters();
+      setPrinters(found);
+      const matched = found.find((name) => name.toLocaleLowerCase().includes("tsc mb240"));
+      if (matched) {
+        setPrinterName(matched);
+        window.localStorage.setItem("twosfood.labelPrinterName", matched);
+        toast.success(`프린터를 확인했습니다: ${matched}`);
+      } else {
+        toast.warning("연결된 프린터 목록에서 TSC MB240을 찾지 못했습니다.");
+      }
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : "프린터 연결 확인에 실패했습니다.");
+    } finally {
+      setCheckingPrinter(false);
+    }
+  };
+
+  const printOneLabel = async () => {
     if (!selected || printInProgress.current) {
       if (printInProgress.current) console.warn("[label-printer] 중복 인쇄 호출을 차단했습니다.");
       return;
     }
-
-    const label = document.querySelector<HTMLElement>(".label-preview-shell .print-label");
-    if (!label) {
-      console.error("[label-printer] 인쇄할 라벨을 찾지 못했습니다.");
-      return;
-    }
-
     printInProgress.current = true;
     setPrinting(true);
     const jobId = globalThis.crypto?.randomUUID?.() ?? String(Date.now());
-    console.info("[label-printer] 단일 인쇄 작업 시작", {
-      jobId,
-      printCalls: 1,
-      labels: 1,
-      pageSize: "60mm x 80mm",
-      productId: selected.id,
-    });
-
-    const frame = document.createElement("iframe");
-    frame.className = "label-print-frame";
-    frame.title = "60mm × 80mm 라벨 인쇄 문서";
-    frame.setAttribute("aria-hidden", "true");
-    document.body.appendChild(frame);
-
-    let fallbackTimer = 0;
-    const finish = () => {
-      window.clearTimeout(fallbackTimer);
-      frame.remove();
+    const expirationDate = addMonths(selected.activeHistory?.foreignSlaughterDate ?? null, 24);
+    try {
+      if (!printerName.trim()) throw new Error("출력할 프린터 이름을 입력해 주세요.");
+      window.localStorage.setItem("twosfood.labelPrinterName", printerName.trim());
+      const artifacts = await createBoxLabelTspl({
+        productName: selected.name,
+        reportNumber: selected.code,
+        historyNumber: selected.activeHistory?.historyNumber ?? "",
+        countryOfOrigin: selected.activeHistory?.countryOfOrigin ?? "",
+        manufactureDate: shortDate(today),
+        expirationDate: shortDate(expirationDate),
+        material: selected.material ?? "",
+      }, { density, speed });
+      console.info("[label-printer] TSPL 단일 전송", { jobId, sends: 1, copies: 1, printerName, density, speed, bytes: artifacts.command.byteLength, productId: selected.id, ...artifacts.debug, firstBitmapBytes: Array.from(artifacts.bitmap.slice(0, 16), (value) => value.toString(16).padStart(2, "0")).join(" ") });
+      await printTspl(printerName.trim(), artifacts.command, `박스라벨-${selected.id}-${jobId}`);
+      toast.success("TSC MB240 인쇄 대기열에 라벨 1장을 전송했습니다.");
+    } catch (cause) {
+      console.error("[label-printer] TSPL 출력 실패", cause);
+      toast.error(cause instanceof Error ? cause.message : "라벨 출력에 실패했습니다.");
+    } finally {
       printInProgress.current = false;
       setPrinting(false);
-    };
-    let printCalled = false;
-    frame.onload = async () => {
-      if (printCalled) return;
-      printCalled = true;
-      const printWindow = frame.contentWindow;
-      const printDocument = frame.contentDocument;
-      if (!printWindow || !printDocument) {
-        finish();
-        return;
-      }
-      await printDocument.fonts?.ready;
-      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-      printWindow.addEventListener("afterprint", finish, { once: true });
-      fallbackTimer = window.setTimeout(finish, 120_000);
-      console.info("[label-printer] iframe window.print 호출", { jobId, printCalls: 1 });
-      printWindow.focus();
-      printWindow.print();
-    };
+    }
+  };
 
-    const styles = Array.from(document.querySelectorAll<HTMLLinkElement | HTMLStyleElement>('link[rel="stylesheet"], style'))
-      .map((element) => element.outerHTML)
-      .join("\n");
-    frame.srcdoc = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><base href="${document.baseURI}">${styles}<style>
-      @page { size: 60mm 80mm; margin: 0; }
-      html, body { width: 60mm !important; height: 80mm !important; margin: 0 !important; padding: 0 !important; overflow: hidden !important; background: #fff !important; }
-      .print-label { position: static !important; box-sizing: border-box !important; width: 60mm !important; height: 80mm !important; min-width: 60mm !important; min-height: 80mm !important; max-width: 60mm !important; max-height: 80mm !important; margin: 0 !important; border: 0 !important; border-radius: 0 !important; overflow: hidden !important; transform: none !important; break-inside: avoid !important; page-break-inside: avoid !important; page-break-after: avoid !important; }
-    </style></head><body>${label.outerHTML}</body></html>`;
+  const saveDebugArtifacts = async () => {
+    if (!selected || savingDebug) return;
+    setSavingDebug(true);
+    try {
+      const expirationDate = addMonths(selected.activeHistory?.foreignSlaughterDate ?? null, 24);
+      const artifacts = await createBoxLabelTspl({
+        productName: selected.name,
+        reportNumber: selected.code,
+        historyNumber: selected.activeHistory?.historyNumber ?? "",
+        countryOfOrigin: selected.activeHistory?.countryOfOrigin ?? "",
+        manufactureDate: shortDate(today),
+        expirationDate: shortDate(expirationDate),
+        material: selected.material ?? "",
+      }, { density, speed });
+      const png = await new Promise<Blob>((resolve, reject) => artifacts.canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("PNG 생성에 실패했습니다.")), "image/png"));
+      const prefix = `box-label-${selected.id}`;
+      downloadFile(`${prefix}-canvas.png`, png);
+      downloadFile(`${prefix}-bitmap.hex.txt`, new Blob([bitmapHexDump(artifacts.bitmap, artifacts.debug.widthBytes)], { type: "text/plain;charset=utf-8" }));
+      downloadFile(`${prefix}.tspl`, new Blob([artifacts.command], { type: "application/octet-stream" }));
+      downloadFile(`${prefix}-debug.json`, new Blob([JSON.stringify({ ...artifacts.debug, density, speed, firstBitmapBytes: Array.from(artifacts.bitmap.slice(0, 32), (value) => value.toString(16).padStart(2, "0")) }, null, 2)], { type: "application/json;charset=utf-8" }));
+      toast.success("Canvas PNG, Bitmap Hex, TSPL Raw와 진단 정보를 저장했습니다.");
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : "디버그 파일 저장에 실패했습니다.");
+    } finally {
+      setSavingDebug(false);
+    }
   };
 
   const search = async (event: FormEvent) => {
@@ -218,8 +261,8 @@ export function LabelPrinterWorkspace() {
   ].filter(Boolean) as string[] : [];
 
   return (
-    <section className="label-printer-workspace space-y-5">
-      <div className="screen-only rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="space-y-5">
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <form onSubmit={search} className="flex flex-col gap-2 sm:flex-row">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={17} />
@@ -242,7 +285,13 @@ export function LabelPrinterWorkspace() {
 
       {tab === "box" ? <div className="label-work-area grid gap-5 xl:grid-cols-[minmax(320px,1fr)_440px]">
         <div className="screen-only rounded-xl border border-slate-200 bg-white p-5">
-          <div className="flex items-center justify-between"><div><h3 className="font-bold text-slate-900">박스라벨(20kg)</h3><p className="mt-1 text-sm text-slate-500">오른쪽 미리보기와 동일한 크기로 출력됩니다.</p></div><Button type="button" onClick={printOneLabel} disabled={!selected || printing}><Printer size={17} />{printing ? "인쇄 창 여는 중..." : "인쇄"}</Button></div>
+          <div className="mb-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <div className="flex flex-col gap-2 sm:flex-row"><div className="flex-1"><label htmlFor="label-printer-name" className="text-xs font-semibold text-slate-600">QZ Tray 프린터 이름</label><Input id="label-printer-name" list="label-printer-list" value={printerName} onChange={(event) => setPrinterName(event.target.value)} className="mt-1 bg-white" placeholder="예: TSC MB240" /><datalist id="label-printer-list">{printers.map((printer) => <option key={printer} value={printer} />)}</datalist></div><Button type="button" variant="outline" onClick={checkPrinter} disabled={checkingPrinter} className="self-end">{checkingPrinter ? "확인 중..." : "연결 확인"}</Button></div>
+            <div className="mt-3 grid grid-cols-2 gap-3"><label className="text-xs font-semibold text-slate-600">인쇄 농도 (0~15)<Input type="number" min={0} max={15} step={1} value={density} onChange={(event) => setDensity(Math.min(15, Math.max(0, Number(event.target.value))))} className="mt-1 bg-white" /></label><label className="text-xs font-semibold text-slate-600">인쇄 속도 (IPS)<Input type="number" min={1} max={10} step={0.5} value={speed} onChange={(event) => setSpeed(Math.min(10, Math.max(1, Number(event.target.value))))} className="mt-1 bg-white" /></label></div>
+            <p className="mt-2 text-xs text-slate-500">권장 시작값은 농도 6, 속도 3 IPS입니다. 번지면 농도를 1씩 낮추고, 흐리면 1씩 올려 테스트하세요.</p>
+            <p className="mt-2 text-xs text-slate-500">QZ Tray가 이 PC에서 실행 중이어야 하며 Windows에 등록된 프린터 이름과 정확히 일치해야 합니다. <a href="https://qz.io/download/" target="_blank" rel="noreferrer" className="font-semibold text-blue-600 underline">QZ Tray 설치</a></p>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="font-bold text-slate-900">박스라벨(20kg)</h3><p className="mt-1 text-sm text-slate-500">미리보기 데이터로 TSPL 60×80mm 라벨 1장을 직접 전송합니다.</p></div><div className="flex gap-2"><Button type="button" variant="outline" onClick={saveDebugArtifacts} disabled={!selected || savingDebug}>{savingDebug ? "진단 저장 중..." : "디버그 저장"}</Button><Button type="button" onClick={printOneLabel} disabled={!selected || printing}><Printer size={17} />{printing ? "TSPL 전송 중..." : "직접 인쇄"}</Button></div></div>
           {!selected ? <div className="mt-5 rounded-lg border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">제품을 검색한 후 선택해 주세요.</div> : <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2">
             <div><dt className="text-slate-400">제품명</dt><dd className="font-semibold">{selected.name}</dd></div>
             <div><dt className="text-slate-400">품목보고번호</dt><dd className="font-semibold">{selected.code || "-"}</dd></div>
