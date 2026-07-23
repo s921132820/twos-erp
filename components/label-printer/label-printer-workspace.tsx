@@ -1,12 +1,12 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, type MouseEvent, useEffect, useRef, useState } from "react";
 import { AlertTriangle, PackageSearch, Printer, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createBoxLabelTspl, renderBoxLabelCanvas, type BoxLabelPrintData } from "@/lib/printing/box-label-tspl";
-import { cloneLabelPrintConfig, dotsToMm, LABEL_PRINT_CONFIGS, type LabelFieldKey, type LabelPrintConfig } from "@/lib/printing/label-print-config";
+import { cloneLabelPrintConfig, dotsToMm, LABEL_PRINT_CONFIGS, normalizeLabelPrintConfig, type LabelFieldKey, type LabelPrintConfig } from "@/lib/printing/label-print-config";
 import { listQzPrinters, printTspl } from "@/lib/printing/qz-client";
 import { cn } from "@/lib/utils";
 
@@ -33,15 +33,36 @@ const tabs: Array<{ id: Tab; label: string }> = [
 
 const FIELD_LABELS: Record<LabelFieldKey, string> = {
   productName: "제품명",
-  storage: "냉동",
+  frozenText: "냉동",
+  weight: "중량",
+  weightUnit: "중량 단위",
+  productSpec: "제품규격",
   reportNumber: "품목보고번호",
   importHistoryNumber: "수입이력번호/바코드",
   origin: "원산지",
   today: "오늘 날짜",
   expiryDate: "유통기한",
   material: "원료 및 함량",
+  materialLabel: "원료 및 함량 제목",
+  storageMethod: "보관방법",
+  foodType: "식품의 유형",
+  packagingMaterial: "포장재질",
+  notice: "주의사항",
+  barcodeNumber: "바코드 번호",
+  manufacturer: "제조원",
+  manufacturerAddress: "제조원 주소",
+  manufacturerPhone: "전화번호",
 };
 const FIELD_KEYS = Object.keys(FIELD_LABELS) as LabelFieldKey[];
+const FIELD_DATA_KEYS: Record<LabelFieldKey, keyof BoxLabelPrintData> = {
+  productName: "productName", frozenText: "frozenText", weight: "weight", weightUnit: "weightUnit",
+  productSpec: "productSpec", reportNumber: "reportNumber", importHistoryNumber: "historyNumber",
+  origin: "countryOfOrigin", today: "manufactureDate", expiryDate: "expirationDate",
+  material: "material", materialLabel: "materialLabel", storageMethod: "storageMethod",
+  foodType: "foodType", packagingMaterial: "packagingMaterial", notice: "notice",
+  barcodeNumber: "barcodeNumber", manufacturer: "manufacturer",
+  manufacturerAddress: "manufacturerAddress", manufacturerPhone: "manufacturerPhone",
+};
 
 function dateInSeoul() {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -72,6 +93,33 @@ function shortDate(value: string) {
   return value ? value.slice(2).replaceAll("-", ".") : "";
 }
 
+function defaultLabelData(today: string, product?: LabelProduct): BoxLabelPrintData {
+  const history = product?.activeHistory;
+  const expirationDate = addMonths(history?.foreignSlaughterDate ?? null, 24);
+  return {
+    productName: product?.name ?? "",
+    frozenText: "냉동",
+    weight: "20",
+    weightUnit: "kg",
+    productSpec: "■ 제품규격: 20 kg",
+    reportNumber: product?.code ?? "",
+    historyNumber: history?.historyNumber ?? "",
+    barcodeNumber: history?.historyNumber ?? "",
+    countryOfOrigin: history?.countryOfOrigin ?? "",
+    manufactureDate: shortDate(today),
+    expirationDate: expirationDate ? `${shortDate(expirationDate)}까지` : "",
+    material: product?.material ?? "",
+    materialLabel: "■ 원료 및 함량:",
+    storageMethod: "냉동보관",
+    foodType: "돼지고기 함유",
+    packagingMaterial: "- HDPE\n- 골판지 / 진공포장",
+    notice: "■ 본 제품은 등록된 제조시설에서 제조하고 있습니다.",
+    manufacturer: "제조원: (주)투에스푸드",
+    manufacturerAddress: "경기도 광주시 도척면 도척로 699번길 30-8",
+    manufacturerPhone: "TEL:031-8027-2650",
+  };
+}
+
 function downloadFile(name: string, blob: Blob) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -90,17 +138,30 @@ function bitmapHexDump(bitmap: Uint8Array, widthBytes: number) {
   return lines.join("\n");
 }
 
-function CanvasPreview({ data, layout }: { data: BoxLabelPrintData; layout: LabelPrintConfig }) {
+function CanvasPreview({ data, layout, selectedField, onSelectField }: { data: BoxLabelPrintData; layout: LabelPrintConfig; selectedField: LabelFieldKey; onSelectField: (key: LabelFieldKey) => void }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     let cancelled = false;
-    void renderBoxLabelCanvas(data, layout).then(({ canvas }) => {
+    void renderBoxLabelCanvas(data, layout, { selectedField }).then(({ canvas }) => {
       if (cancelled || !ref.current) return;
       ref.current.getContext("2d")?.drawImage(canvas, 0, 0);
     });
     return () => { cancelled = true; };
-  }, [data, layout]);
-  return <canvas ref={ref} width={480} height={640} className="box-label-canvas" aria-label="박스라벨 20kg 실시간 미리보기" />;
+  }, [data, layout, selectedField]);
+  const selectAtPoint = (event: MouseEvent<HTMLCanvasElement>) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const x = (event.clientX - bounds.left) * 480 / bounds.width;
+    const y = (event.clientY - bounds.top) * 720 / bounds.height;
+    const hit = [...FIELD_KEYS].reverse().find((key) => {
+      const field = layout.fields[key];
+      const manufacturerField = key === "manufacturer" || key === "manufacturerAddress" || key === "manufacturerPhone";
+      const fieldX = field.x + (manufacturerField ? layout.manufacturerGroupOffsetX : layout.contentOffsetX);
+      const fieldY = field.y + (manufacturerField ? layout.manufacturerGroupOffsetY : layout.contentOffsetY);
+      return x >= fieldX && x <= fieldX + field.width && y >= fieldY && y <= fieldY + field.height;
+    });
+    if (hit) onSelectField(hit);
+  };
+  return <canvas ref={ref} width={480} height={720} onClick={selectAtPoint} className="box-label-canvas cursor-crosshair" aria-label="박스라벨 20kg 실시간 미리보기" />;
 }
 
 export function LabelPrinterWorkspace() {
@@ -120,40 +181,52 @@ export function LabelPrinterWorkspace() {
   const [speed, setSpeed] = useState(3);
   const [printConfig, setPrintConfig] = useState<LabelPrintConfig>(() => cloneLabelPrintConfig(LABEL_PRINT_CONFIGS.box20kg));
   const [selectedField, setSelectedField] = useState<LabelFieldKey>("productName");
-  const [labelData, setLabelData] = useState<BoxLabelPrintData>(() => ({
-    productName: "",
-    reportNumber: "",
-    historyNumber: "",
-    countryOfOrigin: "",
-    manufactureDate: shortDate(dateInSeoul()),
-    expirationDate: "",
-    material: "",
-  }));
+  const [fieldSearch, setFieldSearch] = useState("");
+  const [movementStep, setMovementStep] = useState(1);
+  const [labelData, setLabelData] = useState<BoxLabelPrintData>(() => defaultLabelData(dateInSeoul()));
+  const [sourceLabelData, setSourceLabelData] = useState<BoxLabelPrintData>(() => defaultLabelData(dateInSeoul()));
+  const initialLayoutRef = useRef<LabelPrintConfig>(cloneLabelPrintConfig(LABEL_PRINT_CONFIGS.box20kg));
   const printInProgress = useRef(false);
   const today = dateInSeoul();
   const selectedLayout = printConfig.fields[selectedField];
+  const visibleFieldKeys = FIELD_KEYS.filter((key) => FIELD_LABELS[key].toLocaleLowerCase().includes(fieldSearch.trim().toLocaleLowerCase()));
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem("twosfood.box20kgLayout");
+    if (!saved) return;
+    try {
+      const savedLayout = normalizeLabelPrintConfig(JSON.parse(saved) as LabelPrintConfig);
+      initialLayoutRef.current = cloneLabelPrintConfig(savedLayout);
+      queueMicrotask(() => setPrintConfig(cloneLabelPrintConfig(savedLayout)));
+    } catch {
+      window.localStorage.removeItem("twosfood.box20kgLayout");
+      toast.error("저장된 라벨 배치가 손상되어 코드 기본값으로 시작했습니다.");
+    }
+  }, []);
   const layoutErrors = FIELD_KEYS.flatMap((key) => {
     const field = printConfig.fields[key];
-    const x = field.x + printConfig.contentOffsetX;
-    const y = field.y + printConfig.contentOffsetY;
+    const manufacturerField = key === "manufacturer" || key === "manufacturerAddress" || key === "manufacturerPhone";
+    const x = field.x + (manufacturerField ? printConfig.manufacturerGroupOffsetX : printConfig.contentOffsetX);
+    const y = field.y + (manufacturerField ? printConfig.manufacturerGroupOffsetY : printConfig.contentOffsetY);
     const messages: string[] = [];
-    if (x < 0 || y < 0 || x + field.width > 480 || y + field.height > 640) messages.push(`${FIELD_LABELS[key]} 영역이 라벨 경계를 벗어났습니다.`);
+    if (x < 0 || y < 0 || x + field.width > 480 || y + field.height > 720) messages.push(`${FIELD_LABELS[key]} 영역이 라벨 경계를 벗어났습니다.`);
     if (field.height < field.fontSize + field.paddingY * 2) messages.push(`${FIELD_LABELS[key]} 높이가 글자와 세로 여백보다 작습니다.`);
+    const value = labelData[FIELD_DATA_KEYS[key]];
+    const estimatedCapacity = Math.max(1, Math.floor((field.width - field.paddingX * 2) / Math.max(4, field.fontSize * 0.65))) * Math.max(1, field.maxLines ?? 1);
+    if (!field.autoFit && value.length > estimatedCapacity) messages.push(`${FIELD_LABELS[key]} 내용이 설정 영역을 초과할 수 있습니다. 자동 축소를 켜거나 영역을 넓혀 주세요.`);
     return messages;
   });
 
   const selectProduct = (product: LabelProduct) => {
-    const expirationDate = addMonths(product.activeHistory?.foreignSlaughterDate ?? null, 24);
+    const values = defaultLabelData(today, product);
     setSelected(product);
-    setLabelData({
-      productName: product.name,
-      reportNumber: product.code,
-      historyNumber: product.activeHistory?.historyNumber ?? "",
-      countryOfOrigin: product.activeHistory?.countryOfOrigin ?? "",
-      manufactureDate: shortDate(today),
-      expirationDate: shortDate(expirationDate),
-      material: product.material ?? "",
-    });
+    setSourceLabelData(values);
+    setLabelData(values);
+  };
+
+  const resetSelectedValue = () => {
+    const dataKey = FIELD_DATA_KEYS[selectedField];
+    setLabelData((current) => ({ ...current, [dataKey]: sourceLabelData[dataKey] }));
   };
 
   const updateFieldLayout = (patch: Partial<LabelPrintConfig["fields"][LabelFieldKey]>) => {
@@ -166,17 +239,21 @@ export function LabelPrinterWorkspace() {
     }));
   };
 
-  const resetLayout = () => setPrintConfig(cloneLabelPrintConfig(LABEL_PRINT_CONFIGS.box20kg));
+  const resetLayout = () => setPrintConfig(cloneLabelPrintConfig(initialLayoutRef.current));
   const saveLayout = () => {
     if (layoutErrors.length) return toast.error(layoutErrors[0]);
-    window.localStorage.setItem("twosfood.box20kgLayout", JSON.stringify(printConfig));
-    toast.success("현재 박스라벨 배치를 이 PC에 저장했습니다.");
+    const normalized = normalizeLabelPrintConfig(printConfig);
+    window.localStorage.setItem("twosfood.box20kgLayout", JSON.stringify(normalized));
+    initialLayoutRef.current = cloneLabelPrintConfig(normalized);
+    toast.success("현재 배치를 이 PC의 시작 기본값으로 저장했습니다.");
   };
   const loadLayout = () => {
     try {
       const saved = window.localStorage.getItem("twosfood.box20kgLayout");
       if (!saved) return toast.info("저장된 박스라벨 배치가 없습니다.");
-      setPrintConfig(JSON.parse(saved) as LabelPrintConfig);
+      const savedLayout = normalizeLabelPrintConfig(JSON.parse(saved) as LabelPrintConfig);
+      initialLayoutRef.current = cloneLabelPrintConfig(savedLayout);
+      setPrintConfig(savedLayout);
       toast.success("마지막 저장 배치를 불러왔습니다.");
     } catch {
       toast.error("저장된 배치 설정을 읽지 못했습니다.");
@@ -311,33 +388,51 @@ export function LabelPrinterWorkspace() {
             <p className="mt-2 text-xs text-slate-500">권장 시작값은 농도 6, 속도 3 IPS입니다. 번지면 농도를 1씩 낮추고, 흐리면 1씩 올려 테스트하세요.</p>
             <div className="mt-4 space-y-3 border-t border-slate-200 pt-4">
               <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-bold text-slate-700">필드별 배치 편집 · 203dpi</p><div className="flex flex-wrap gap-2"><button type="button" onClick={resetLayout} className="text-xs font-semibold text-slate-600 hover:underline">초기값 복원</button><button type="button" onClick={loadLayout} className="text-xs font-semibold text-blue-600 hover:underline">마지막 저장값</button><button type="button" onClick={saveLayout} className="text-xs font-semibold text-emerald-700 hover:underline">현재 배치 저장</button></div></div>
-              <select value={selectedField} onChange={(event) => setSelectedField(event.target.value as LabelFieldKey)} className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm">{FIELD_KEYS.map((key) => <option key={key} value={key}>{FIELD_LABELS[key]}</option>)}</select>
+              <Input value={fieldSearch} onChange={(event) => setFieldSearch(event.target.value)} placeholder="조정할 필드 검색" className="bg-white" />
+              <select value={selectedField} onChange={(event) => setSelectedField(event.target.value as LabelFieldKey)} className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm">{visibleFieldKeys.map((key) => <option key={key} value={key}>{FIELD_LABELS[key]}</option>)}</select>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {(["x", "y", "width", "height", "fontSize", "lineHeight", "paddingX", "paddingY"] as const).map((property) => <label key={property} className="text-xs font-semibold text-slate-600">{property}<Input type="number" step={1} value={selectedLayout[property]} onChange={(event) => updateFieldLayout({ [property]: Number(event.target.value) })} className="mt-1 bg-white" /></label>)}
+                {(["x", "y", "width", "height", "fontSize", "fontWeight", "lineHeight", "paddingX", "paddingY", "maxLines", "rotation"] as const).map((property) => <label key={property} className="text-xs font-semibold text-slate-600">{property}<Input type="number" step={property === "fontWeight" ? 100 : 1} value={selectedLayout[property] ?? (property === "rotation" ? 0 : 1)} onChange={(event) => updateFieldLayout({ [property]: Number(event.target.value) })} className="mt-1 bg-white" /></label>)}
                 <label className="text-xs font-semibold text-slate-600">정렬<select value={selectedLayout.align} onChange={(event) => updateFieldLayout({ align: event.target.value as "left" | "center" | "right" })} className="mt-1 h-9 w-full rounded-md border border-slate-300 bg-white px-2"><option value="left">왼쪽</option><option value="center">가운데</option><option value="right">오른쪽</option></select></label>
+                <label className="text-xs font-semibold text-slate-600">세로 정렬<select value={selectedLayout.verticalAlign ?? "middle"} onChange={(event) => updateFieldLayout({ verticalAlign: event.target.value as "top" | "middle" | "bottom" })} className="mt-1 h-9 w-full rounded-md border border-slate-300 bg-white px-2"><option value="top">위</option><option value="middle">가운데</option><option value="bottom">아래</option></select></label>
+                <label className="flex items-end gap-2 pb-2 text-xs font-semibold text-slate-600"><input type="checkbox" checked={selectedLayout.autoFit ?? false} onChange={(event) => updateFieldLayout({ autoFit: event.target.checked })} />자동 축소</label>
                 <label className="flex items-end gap-2 pb-2 text-xs font-semibold text-slate-600"><input type="checkbox" checked={selectedLayout.visible} onChange={(event) => updateFieldLayout({ visible: event.target.checked })} />표시</label>
               </div>
-              <div className="flex flex-wrap gap-2">{([["←", "x", -1, "1dot"], ["→", "x", 1, "1dot"], ["↑", "y", -1, "1dot"], ["↓", "y", 1, "1dot"], ["←", "x", -8, "1mm"], ["→", "x", 8, "1mm"], ["↑", "y", -8, "1mm"], ["↓", "y", 8, "1mm"]] as const).map(([label, axis, amount, unit]) => <Button key={`${label}-${unit}`} type="button" variant="outline" onClick={() => updateFieldLayout({ [axis]: selectedLayout[axis] + amount })} className="h-8 px-3">{label} {unit}</Button>)}</div>
-              <p className="text-xs text-slate-500">현재 위치: X {selectedLayout.x}dot ({dotsToMm(selectedLayout.x).toFixed(2)}mm), Y {selectedLayout.y}dot ({dotsToMm(selectedLayout.y).toFixed(2)}mm). 콘텐츠 그룹 Y는 {printConfig.contentOffsetY}dot이며 제조원은 이동하지 않습니다.</p>
+              <div className="flex flex-wrap items-center gap-2"><select value={movementStep} onChange={(event) => setMovementStep(Number(event.target.value))} className="h-8 rounded-md border border-slate-300 bg-white px-2 text-xs"><option value={1}>1dot</option><option value={5}>5dot</option><option value={8}>1mm</option></select>{([["←", "x", -1], ["→", "x", 1], ["↑", "y", -1], ["↓", "y", 1]] as const).map(([label, axis, direction]) => <Button key={label} type="button" variant="outline" onClick={() => updateFieldLayout({ [axis]: selectedLayout[axis] + direction * movementStep })} className="h-8 px-3">{label}</Button>)}</div>
+              <div className="grid grid-cols-2 gap-2"><label className="text-xs font-semibold text-slate-600">제조원 그룹 X<Input type="number" value={printConfig.manufacturerGroupOffsetX} onChange={(event) => setPrintConfig((current) => ({ ...current, manufacturerGroupOffsetX: Number(event.target.value) }))} className="mt-1" /></label><label className="text-xs font-semibold text-slate-600">제조원 그룹 Y<Input type="number" value={printConfig.manufacturerGroupOffsetY} onChange={(event) => setPrintConfig((current) => ({ ...current, manufacturerGroupOffsetY: Number(event.target.value) }))} className="mt-1" /></label></div>
+              <p className="text-xs text-slate-500">현재 위치: X {selectedLayout.x}dot ({dotsToMm(selectedLayout.x).toFixed(2)}mm), Y {selectedLayout.y}dot ({dotsToMm(selectedLayout.y).toFixed(2)}mm). 제조원 3개 필드는 개별 좌표에 제조원 그룹 오프셋을 더해 출력합니다.</p>
               {layoutErrors.length > 0 && <div role="alert" className="rounded-md bg-red-50 p-2 text-xs font-semibold text-red-700">{layoutErrors[0]} 저장 및 출력을 진행할 수 없습니다.</div>}
             </div>
             <p className="mt-2 text-xs text-slate-500">QZ Tray가 이 PC에서 실행 중이어야 하며 Windows에 등록된 프린터 이름과 정확히 일치해야 합니다. <a href="https://qz.io/download/" target="_blank" rel="noreferrer" className="font-semibold text-blue-600 underline">QZ Tray 설치</a></p>
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="font-bold text-slate-900">박스라벨(20kg)</h3><p className="mt-1 text-sm text-slate-500">미리보기 데이터로 TSPL 60×80mm 라벨 1장을 직접 전송합니다.</p></div><div className="flex gap-2"><Button type="button" variant="outline" onClick={saveDebugArtifacts} disabled={!selected || savingDebug}>{savingDebug ? "진단 저장 중..." : "디버그 저장"}</Button><Button type="button" onClick={printOneLabel} disabled={!selected || printing}><Printer size={17} />{printing ? "TSPL 전송 중..." : "직접 인쇄"}</Button></div></div>
+          <div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="font-bold text-slate-900">박스라벨(20kg)</h3><p className="mt-1 text-sm text-slate-500">미리보기 데이터로 TSPL 60×90mm 라벨 1장을 직접 전송합니다.</p></div><div className="flex gap-2"><Button type="button" variant="outline" onClick={saveDebugArtifacts} disabled={!selected || savingDebug}>{savingDebug ? "진단 저장 중..." : "디버그 저장"}</Button><Button type="button" onClick={printOneLabel} disabled={!selected || printing}><Printer size={17} />{printing ? "TSPL 전송 중..." : "직접 인쇄"}</Button></div></div>
           {!selected ? <div className="mt-5 rounded-lg border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">제품을 검색한 후 선택해 주세요.</div> : <div className="mt-5 grid gap-3 text-sm sm:grid-cols-2">
             <label className="text-xs font-semibold text-slate-600">제품명<Input value={labelData.productName} onChange={(event) => setLabelData((current) => ({ ...current, productName: event.target.value }))} className="mt-1" /></label>
+            <label className="text-xs font-semibold text-slate-600">냉동 문구<Input value={labelData.frozenText} onChange={(event) => setLabelData((current) => ({ ...current, frozenText: event.target.value }))} className="mt-1" /></label>
+            <label className="text-xs font-semibold text-slate-600">중량<Input value={labelData.weight} onChange={(event) => setLabelData((current) => ({ ...current, weight: event.target.value }))} className="mt-1" /></label>
+            <label className="text-xs font-semibold text-slate-600">중량 단위<Input value={labelData.weightUnit} onChange={(event) => setLabelData((current) => ({ ...current, weightUnit: event.target.value }))} className="mt-1" /></label>
+            <label className="text-xs font-semibold text-slate-600 sm:col-span-2">제품규격<Input value={labelData.productSpec} onChange={(event) => setLabelData((current) => ({ ...current, productSpec: event.target.value }))} className="mt-1" /></label>
             <label className="text-xs font-semibold text-slate-600">품목보고번호<Input value={labelData.reportNumber} onChange={(event) => setLabelData((current) => ({ ...current, reportNumber: event.target.value }))} className="mt-1" /></label>
             <label className="text-xs font-semibold text-slate-600">수입이력번호<Input value={labelData.historyNumber} onChange={(event) => setLabelData((current) => ({ ...current, historyNumber: event.target.value }))} className="mt-1" /></label>
+            <label className="text-xs font-semibold text-slate-600">바코드 번호<Input value={labelData.barcodeNumber} onChange={(event) => setLabelData((current) => ({ ...current, barcodeNumber: event.target.value }))} className="mt-1" /></label>
             <label className="text-xs font-semibold text-slate-600">원산지<Input value={labelData.countryOfOrigin} onChange={(event) => setLabelData((current) => ({ ...current, countryOfOrigin: event.target.value }))} className="mt-1" /></label>
             <label className="text-xs font-semibold text-slate-600">오늘 날짜<Input value={labelData.manufactureDate} onChange={(event) => setLabelData((current) => ({ ...current, manufactureDate: event.target.value }))} className="mt-1" /></label>
             <label className="text-xs font-semibold text-slate-600">유통기한<Input value={labelData.expirationDate} onChange={(event) => setLabelData((current) => ({ ...current, expirationDate: event.target.value }))} className="mt-1" /></label>
             <label className="text-xs font-semibold text-slate-600 sm:col-span-2">원료 및 함량<textarea value={labelData.material} onChange={(event) => setLabelData((current) => ({ ...current, material: event.target.value }))} rows={4} className="mt-1 w-full rounded-md border border-slate-300 p-3" /></label>
+            <label className="text-xs font-semibold text-slate-600 sm:col-span-2">원료 및 함량 제목<Input value={labelData.materialLabel} onChange={(event) => setLabelData((current) => ({ ...current, materialLabel: event.target.value }))} className="mt-1" /></label>
+            <label className="text-xs font-semibold text-slate-600 sm:col-span-2">보관방법<textarea value={labelData.storageMethod} onChange={(event) => setLabelData((current) => ({ ...current, storageMethod: event.target.value }))} rows={2} className="mt-1 w-full rounded-md border border-slate-300 p-3" /></label>
+            <label className="text-xs font-semibold text-slate-600 sm:col-span-2">식품의 유형<Input value={labelData.foodType} onChange={(event) => setLabelData((current) => ({ ...current, foodType: event.target.value }))} className="mt-1" /></label>
+            <label className="text-xs font-semibold text-slate-600 sm:col-span-2">포장재질<textarea value={labelData.packagingMaterial} onChange={(event) => setLabelData((current) => ({ ...current, packagingMaterial: event.target.value }))} rows={2} className="mt-1 w-full rounded-md border border-slate-300 p-3" /></label>
+            <label className="text-xs font-semibold text-slate-600 sm:col-span-2">주의사항<textarea value={labelData.notice} onChange={(event) => setLabelData((current) => ({ ...current, notice: event.target.value }))} rows={2} className="mt-1 w-full rounded-md border border-slate-300 p-3" /></label>
+            <label className="text-xs font-semibold text-slate-600 sm:col-span-2">제조원<Input value={labelData.manufacturer} onChange={(event) => setLabelData((current) => ({ ...current, manufacturer: event.target.value }))} className="mt-1" /></label>
+            <label className="text-xs font-semibold text-slate-600 sm:col-span-2">제조원 주소<textarea value={labelData.manufacturerAddress} onChange={(event) => setLabelData((current) => ({ ...current, manufacturerAddress: event.target.value }))} rows={2} className="mt-1 w-full rounded-md border border-slate-300 p-3" /></label>
+            <label className="text-xs font-semibold text-slate-600 sm:col-span-2">전화번호<Input value={labelData.manufacturerPhone} onChange={(event) => setLabelData((current) => ({ ...current, manufacturerPhone: event.target.value }))} className="mt-1" /></label>
+            <div className="flex flex-wrap gap-2 sm:col-span-2"><Button type="button" variant="outline" onClick={resetSelectedValue}>선택 필드 원본값 복원</Button><Button type="button" variant="outline" onClick={() => setLabelData(sourceLabelData)}>전체 내용 초기화</Button></div>
             <p className="text-xs text-slate-500 sm:col-span-2">여기서 수정한 값은 현재 인쇄 세션에만 적용되며 제품 DB에는 저장되지 않습니다.</p>
           </div>}
           {selected && selected.activeHistoryCount > 1 && <p className="mt-4 rounded-lg bg-blue-50 p-3 text-sm text-blue-800">활성 이력이 {selected.activeHistoryCount}개여서 가장 최근 수정된 이력을 사용합니다.</p>}
           {missing.length > 0 && <div className="mt-4 flex gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-800"><AlertTriangle className="mt-0.5 shrink-0" size={17} /><span>다음 정보가 없어 빈 값으로 표시됩니다: {missing.join(", ")}</span></div>}
         </div>
-        <div className="label-preview-shell"><CanvasPreview data={labelData} layout={printConfig} /></div>
+        <div className="label-preview-shell"><CanvasPreview data={labelData} layout={printConfig} selectedField={selectedField} onSelectField={setSelectedField} /></div>
       </div> : <div className="screen-only flex min-h-80 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white"><div className="text-center"><Printer className="mx-auto text-slate-300" size={36} /><h3 className="mt-3 font-bold text-slate-700">{tabs.find((item) => item.id === tab)?.label}</h3><p className="mt-1 text-sm text-slate-500">준비 중입니다.</p></div></div>}
     </section>
   );

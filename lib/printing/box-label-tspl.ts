@@ -1,21 +1,34 @@
 import JsBarcode from "jsbarcode";
-import type { LabelFieldLayout, LabelPrintConfig } from "@/lib/printing/label-print-config";
+import type { LabelFieldKey, LabelFieldLayout, LabelPrintConfig } from "@/lib/printing/label-print-config";
 import { normalizeLabelPrintConfig } from "@/lib/printing/label-print-config";
 
 export type BoxLabelPrintData = {
   productName: string;
+  frozenText: string;
+  weight: string;
+  weightUnit: string;
+  productSpec: string;
   reportNumber: string;
   historyNumber: string;
+  barcodeNumber: string;
   countryOfOrigin: string;
   manufactureDate: string;
   expirationDate: string;
   material: string;
+  materialLabel: string;
+  storageMethod: string;
+  foodType: string;
+  packagingMaterial: string;
+  notice: string;
+  manufacturer: string;
+  manufacturerAddress: string;
+  manufacturerPhone: string;
 };
 
 export type TsplPrintSettings = { density: number; speed: number };
 
 const WIDTH = 480;
-const HEIGHT = 640;
+const HEIGHT = 720;
 
 function wrapLines(context: CanvasRenderingContext2D, text: string, maxWidth: number, maxLines: number) {
   const lines: string[] = [];
@@ -37,6 +50,14 @@ function wrapLines(context: CanvasRenderingContext2D, text: string, maxWidth: nu
 
 function drawField(context: CanvasRenderingContext2D, text: string, layout: LabelFieldLayout, weight = 800, fitSingleLine = false) {
   if (!layout.visible || !text) return;
+  if (layout.rotation) {
+    context.save();
+    context.translate(layout.x + layout.width / 2, layout.y + layout.height / 2);
+    context.rotate(layout.rotation * Math.PI / 180);
+    drawField(context, text, { ...layout, x: -layout.width / 2, y: -layout.height / 2, rotation: 0 }, weight, fitSingleLine);
+    context.restore();
+    return;
+  }
   context.save();
   context.beginPath();
   context.rect(layout.x, layout.y, layout.width, layout.height);
@@ -45,11 +66,14 @@ function drawField(context: CanvasRenderingContext2D, text: string, layout: Labe
   const availableWidth = Math.max(1, layout.width - layout.paddingX * 2);
   const availableHeight = Math.max(1, layout.height - layout.paddingY * 2);
   let fontSize = layout.fontSize;
-  context.font = `${weight} ${fontSize}px Arial, 'Malgun Gothic', sans-serif`;
-  if (fitSingleLine) {
-    while (fontSize > 16 && context.measureText(text).width > availableWidth) {
+  const fontWeight = layout.fontWeight ?? weight;
+  const autoFit = layout.autoFit ?? fitSingleLine;
+  const minimumFontSize = Math.max(6, Math.min(16, layout.fontSize));
+  context.font = `${fontWeight} ${fontSize}px Arial, 'Malgun Gothic', sans-serif`;
+  if (autoFit) {
+    while (fontSize > minimumFontSize && context.measureText(text).width > availableWidth) {
       fontSize -= 1;
-      context.font = `${weight} ${fontSize}px Arial, 'Malgun Gothic', sans-serif`;
+      context.font = `${fontWeight} ${fontSize}px Arial, 'Malgun Gothic', sans-serif`;
     }
   }
   context.textAlign = layout.align;
@@ -60,12 +84,17 @@ function drawField(context: CanvasRenderingContext2D, text: string, layout: Labe
       ? layout.x + layout.width - layout.paddingX
       : layout.x + layout.width / 2;
   const lineHeight = Math.max(fontSize, layout.lineHeight);
-  const maxLines = fitSingleLine && context.measureText(text).width <= availableWidth
+  const maxLines = autoFit && context.measureText(text).width <= availableWidth
     ? 1
-    : Math.max(1, Math.floor(availableHeight / lineHeight));
+    : Math.min(layout.maxLines ?? Number.POSITIVE_INFINITY, Math.max(1, Math.floor(availableHeight / lineHeight)));
   const lines = maxLines === 1 ? [text] : wrapLines(context, text, availableWidth, maxLines);
   const blockHeight = lines.length * lineHeight;
-  const firstLineY = layout.y + layout.paddingY + (availableHeight - blockHeight) / 2 + lineHeight / 2;
+  const verticalOffset = layout.verticalAlign === "top"
+    ? 0
+    : layout.verticalAlign === "bottom"
+      ? availableHeight - blockHeight
+      : (availableHeight - blockHeight) / 2;
+  const firstLineY = layout.y + layout.paddingY + verticalOffset + lineHeight / 2;
   lines.forEach((line, index) => {
     context.fillText(line, x, firstLineY + index * lineHeight);
   });
@@ -74,6 +103,14 @@ function drawField(context: CanvasRenderingContext2D, text: string, layout: Labe
 
 function drawBarcode(context: CanvasRenderingContext2D, value: string, layout: LabelFieldLayout) {
   if (!layout.visible || !value) return;
+  if (layout.rotation) {
+    context.save();
+    context.translate(layout.x + layout.width / 2, layout.y + layout.height / 2);
+    context.rotate(layout.rotation * Math.PI / 180);
+    drawBarcode(context, value, { ...layout, x: -layout.width / 2, y: -layout.height / 2, rotation: 0 });
+    context.restore();
+    return;
+  }
   const barcodeCanvas = document.createElement("canvas");
   JsBarcode(barcodeCanvas, value, {
     format: "CODE128",
@@ -89,7 +126,7 @@ function drawBarcode(context: CanvasRenderingContext2D, value: string, layout: L
   context.drawImage(barcodeCanvas, layout.x, layout.y, layout.width, layout.height);
 }
 
-export async function renderBoxLabelCanvas(data: BoxLabelPrintData, printConfig: LabelPrintConfig) {
+export async function renderBoxLabelCanvas(data: BoxLabelPrintData, printConfig: LabelPrintConfig, options?: { selectedField?: LabelFieldKey }) {
   const config = normalizeLabelPrintConfig(printConfig);
   await document.fonts.ready;
   const canvas = document.createElement("canvas");
@@ -104,27 +141,45 @@ export async function renderBoxLabelCanvas(data: BoxLabelPrintData, printConfig:
 
   context.save();
   context.translate(config.contentOffsetX, config.contentOffsetY);
-  drawField(context, data.productName || "제품명", config.fields.productName, 900, true);
-  drawField(context, "냉동", config.fields.storage, 900, true);
-  drawField(context, "20 kg", { x: 105, y: 82, width: 130, height: 40, fontSize: 31, lineHeight: 34, paddingX: 4, paddingY: 4, align: "center", visible: true }, 900);
-  drawField(context, data.countryOfOrigin || "원산지", config.fields.origin);
+  drawField(context, data.productName, config.fields.productName, 900, true);
+  drawField(context, data.frozenText, config.fields.frozenText);
+  drawField(context, data.weight, config.fields.weight);
+  drawField(context, data.weightUnit, config.fields.weightUnit);
+  drawField(context, data.countryOfOrigin, config.fields.origin);
   drawField(context, data.manufactureDate, config.fields.today);
-  drawField(context, data.expirationDate ? `${data.expirationDate}까지` : "소비기한", config.fields.expiryDate);
-  drawField(context, data.reportNumber || "품목보고번호", config.fields.reportNumber, 900);
-  drawBarcode(context, data.historyNumber, config.fields.importHistoryNumber);
-  drawField(context, "■ 원료 및 함량:", { x: 24, y: 312, width: 118, height: 24, fontSize: 15, lineHeight: 18, paddingX: 0, paddingY: 0, align: "left", visible: true }, 700);
+  drawField(context, data.expirationDate, config.fields.expiryDate);
+  drawField(context, data.reportNumber, config.fields.reportNumber, 900);
+  drawField(context, data.historyNumber, config.fields.importHistoryNumber);
+  drawBarcode(context, data.barcodeNumber, config.fields.barcodeNumber);
+  drawField(context, data.materialLabel, config.fields.materialLabel);
   drawField(context, data.material, config.fields.material, 400);
-  drawField(context, "■ 제품규격: 20 kg", { x: 24, y: 390, width: 220, height: 22, fontSize: 15, lineHeight: 18, paddingX: 0, paddingY: 0, align: "left", visible: true }, 700);
-  drawField(context, "- HDPE\n- 골판지 / 진공포장", { x: 165, y: 430, width: 260, height: 48, fontSize: 15, lineHeight: 22, paddingX: 0, paddingY: 0, align: "left", visible: true }, 700);
-  drawField(context, "■ 본 제품은 등록된 제조시설에서 제조하고 있습니다.", { x: 24, y: 495, width: 430, height: 22, fontSize: 12, lineHeight: 16, paddingX: 0, paddingY: 0, align: "left", visible: true }, 400);
+  drawField(context, data.productSpec, config.fields.productSpec);
+  drawField(context, data.storageMethod, config.fields.storageMethod);
+  drawField(context, data.foodType, config.fields.foodType);
+  drawField(context, data.packagingMaterial, config.fields.packagingMaterial);
+  drawField(context, data.notice, config.fields.notice);
   context.restore();
 
   context.save();
-  context.translate(config.manufacturerOffsetX, config.manufacturerOffsetY);
-  drawField(context, "제조원:", { x: 28, y: 550, width: 90, height: 34, fontSize: 24, lineHeight: 28, paddingX: 0, paddingY: 0, align: "left", visible: true }, 400);
-  drawField(context, "(주)투에스푸드", { x: 115, y: 536, width: 330, height: 48, fontSize: 38, lineHeight: 44, paddingX: 0, paddingY: 0, align: "left", visible: true }, 900);
-  drawField(context, "경기도 광주시 도척면 도척로 699번길 30-8. TEL:031-8027-2650", { x: 28, y: 600, width: 430, height: 18, fontSize: 11, lineHeight: 14, paddingX: 0, paddingY: 0, align: "left", visible: true }, 700);
+  context.translate(config.manufacturerGroupOffsetX, config.manufacturerGroupOffsetY);
+  drawField(context, data.manufacturer, config.fields.manufacturer);
+  drawField(context, data.manufacturerAddress, config.fields.manufacturerAddress);
+  drawField(context, data.manufacturerPhone, config.fields.manufacturerPhone);
   context.restore();
+
+  if (options?.selectedField) {
+    const key = options.selectedField;
+    const layout = config.fields[key];
+    const manufacturerField = key === "manufacturer" || key === "manufacturerAddress" || key === "manufacturerPhone";
+    const offsetX = manufacturerField ? config.manufacturerGroupOffsetX : config.contentOffsetX;
+    const offsetY = manufacturerField ? config.manufacturerGroupOffsetY : config.contentOffsetY;
+    context.save();
+    context.strokeStyle = "#2563eb";
+    context.lineWidth = 2;
+    context.setLineDash([6, 4]);
+    context.strokeRect(layout.x + offsetX, layout.y + offsetY, layout.width, layout.height);
+    context.restore();
+  }
   return { canvas, config };
 }
 
