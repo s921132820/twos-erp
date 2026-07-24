@@ -3,6 +3,7 @@
 import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { isGoatProduct } from "@/lib/products/is-goat-product";
 import { importLivestockHistorySchema, type ImportHistoryFormState } from "@/lib/validations/import-livestock-history";
 
 function formValue(formData: FormData) {
@@ -34,13 +35,53 @@ function historyDatabaseError(error: unknown): ImportHistoryFormState {
   return { status: "error", message: "이력 정보를 처리하지 못했습니다. 잠시 후 다시 시도해 주세요." };
 }
 
-export async function createImportHistory(_previous: ImportHistoryFormState, formData: FormData): Promise<ImportHistoryFormState> {
+async function validatedHistoryData(formData: FormData) {
   const parsed = importLivestockHistorySchema.safeParse(formValue(formData));
-  if (!parsed.success) return { status: "error", message: "입력 내용을 확인해 주세요.", errors: parsed.error.flatten().fieldErrors };
+  if (!parsed.success) {
+    return { state: { status: "error", message: "입력 내용을 확인해 주세요.", errors: parsed.error.flatten().fieldErrors } as ImportHistoryFormState };
+  }
+  const product = await prisma.product.findUnique({
+    where: { id: parsed.data.productId },
+    select: { name: true, category: true, unit: true },
+  });
+  if (!product) return { state: { status: "error", message: "연결할 제품을 찾을 수 없습니다." } as ImportHistoryFormState };
+  const goat = isGoatProduct(product);
+  const historyNumber = parsed.data.historyNumber?.trim() || null;
+  const billOfLadingNumber = parsed.data.billOfLadingNumber?.trim() || null;
+  if (goat && !billOfLadingNumber) {
+    return { state: { status: "error", message: "염소 수입이력은 B/L번호를 입력해 주세요.", errors: { billOfLadingNumber: ["B/L번호는 필수입니다."] } } as ImportHistoryFormState };
+  }
+  if (!goat && !historyNumber) {
+    return { state: { status: "error", message: "수입축산물 이력번호를 입력해 주세요.", errors: { historyNumber: ["이력번호는 필수입니다."] } } as ImportHistoryFormState };
+  }
+  if (!goat && !parsed.data.importDate) {
+    return { state: { status: "error", message: "수입일자를 입력해 주세요.", errors: { importDate: ["수입일자는 필수입니다."] } } as ImportHistoryFormState };
+  }
+  if (!goat && !parsed.data.countryOfOrigin?.trim()) {
+    return { state: { status: "error", message: "원산지를 입력해 주세요.", errors: { countryOfOrigin: ["원산지는 필수입니다."] } } as ImportHistoryFormState };
+  }
+  if (!goat && !parsed.data.supplierName?.trim()) {
+    return { state: { status: "error", message: "공급처를 입력해 주세요.", errors: { supplierName: ["공급처는 필수입니다."] } } as ImportHistoryFormState };
+  }
+  return {
+    data: {
+      ...parsed.data,
+      historyNumber,
+      billOfLadingNumber,
+      importDate: parsed.data.importDate ?? null,
+      countryOfOrigin: parsed.data.countryOfOrigin?.trim() || null,
+      supplierName: parsed.data.supplierName?.trim() || null,
+    },
+  };
+}
+
+export async function createImportHistory(_previous: ImportHistoryFormState, formData: FormData): Promise<ImportHistoryFormState> {
+  const validated = await validatedHistoryData(formData);
+  if (!validated.data) return validated.state;
   try {
-    await prisma.importLivestockHistory.create({ data: parsed.data });
+    await prisma.importLivestockHistory.create({ data: validated.data });
     revalidatePath("/products");
-    revalidatePath(`/products/${parsed.data.productId}/import-histories`);
+    revalidatePath(`/products/${validated.data.productId}/import-histories`);
     return { status: "success", message: "수입축산물 이력을 등록했습니다." };
   } catch (error) {
     return historyDatabaseError(error);
@@ -49,12 +90,12 @@ export async function createImportHistory(_previous: ImportHistoryFormState, for
 
 export async function updateImportHistory(id: number, _previous: ImportHistoryFormState, formData: FormData): Promise<ImportHistoryFormState> {
   if (!Number.isInteger(id) || id < 1) return { status: "error", message: "수정할 이력 정보가 올바르지 않습니다." };
-  const parsed = importLivestockHistorySchema.safeParse(formValue(formData));
-  if (!parsed.success) return { status: "error", message: "입력 내용을 확인해 주세요.", errors: parsed.error.flatten().fieldErrors };
+  const validated = await validatedHistoryData(formData);
+  if (!validated.data) return validated.state;
   try {
-    await prisma.importLivestockHistory.update({ where: { id }, data: parsed.data });
+    await prisma.importLivestockHistory.update({ where: { id }, data: validated.data });
     revalidatePath("/products");
-    revalidatePath(`/products/${parsed.data.productId}/import-histories`);
+    revalidatePath(`/products/${validated.data.productId}/import-histories`);
     return { status: "success", message: "수입축산물 이력을 수정했습니다." };
   } catch (error) {
     return historyDatabaseError(error);

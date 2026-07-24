@@ -7,7 +7,6 @@ const optional = (label: string, max: number) =>
   z.string().trim().max(max, `${label}은(는) ${max}자 이하여야 합니다.`).optional();
 
 export const productSchema = z.object({
-  id: required("제품 ID", 10),
   code: required("품목보고번호", 20),
   unit: required("제품유형", 50),
   description: required("소비기한", 100),

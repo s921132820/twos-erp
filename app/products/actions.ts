@@ -3,11 +3,11 @@
 import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { createProductRecord } from "@/lib/products/mutations";
 import { productSchema, type ProductFormState } from "@/lib/validations/product";
 
 function formValue(formData: FormData) {
   return {
-    id: formData.get("id"),
     code: formData.get("code"),
     unit: formData.get("unit"),
     description: formData.get("description"),
@@ -19,7 +19,7 @@ function formValue(formData: FormData) {
 
 function databaseError(error: unknown): ProductFormState {
   if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-    return { status: "error", message: "제품 ID 또는 품목보고번호가 이미 사용 중입니다." };
+    return { status: "error", message: "제품 ID를 생성하지 못했습니다. 잠시 후 다시 시도해 주세요." };
   }
   console.error("Product database operation failed", error);
   return { status: "error", message: "처리 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요." };
@@ -29,7 +29,7 @@ export async function createProduct(_previous: ProductFormState, formData: FormD
   const parsed = productSchema.safeParse(formValue(formData));
   if (!parsed.success) return { status: "error", message: "입력 내용을 확인해 주세요.", errors: parsed.error.flatten().fieldErrors };
   try {
-    await prisma.product.create({ data: { ...parsed.data, material: parsed.data.material ?? null } });
+    await createProductRecord(parsed.data);
     revalidatePath("/products");
     revalidatePath("/label-printer");
     return { status: "success", message: "제품을 등록했습니다." };

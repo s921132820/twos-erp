@@ -7,8 +7,8 @@ datasource db {
 }
 
 model Product {
-  id          String    @id @map("p_id") @db.VarChar(10)
-  code        String    @unique(map: "uk_report_number") @map("report_number") @db.VarChar(20)
+  id          String    @id @default(dbgenerated()) @map("p_id") @db.VarChar(10)
+  code        String    @map("report_number") @db.VarChar(20)
   unit        String    @map("product_type") @db.VarChar(50)
   description String    @map("expiration_period") @db.VarChar(100)
   name        String    @map("product_name") @db.VarChar(100)
@@ -24,10 +24,10 @@ model Product {
 model ImportLivestockHistory {
   id              Int       @id @default(autoincrement())
   productId       String    @map("product_id") @db.VarChar(10)
-  historyNumber   String    @unique(map: "uk_import_history_number") @map("history_number") @db.VarChar(50)
-  importDate      DateTime  @map("import_date") @db.Date
-  countryOfOrigin String    @map("country_of_origin") @db.VarChar(100)
-  supplierName    String    @map("supplier_name") @db.VarChar(150)
+  historyNumber   String?   @unique(map: "uk_import_history_number") @map("history_number") @db.VarChar(50)
+  importDate      DateTime? @map("import_date") @db.Date
+  countryOfOrigin String?   @map("country_of_origin") @db.VarChar(100)
+  supplierName    String?   @map("supplier_name") @db.VarChar(150)
   itemName        String?   @map("item_name") @db.VarChar(200)
   billOfLadingNumber String? @map("bill_of_lading_number") @db.VarChar(100)
   exporterName    String?   @map("exporter_name") @db.VarChar(200)

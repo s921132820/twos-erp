@@ -23,12 +23,17 @@ const optionalStartDate = z.preprocess(
     .optional(),
 );
 
+const optionalDate = z.preprocess(
+  (value) => typeof value === "string" && !value.trim() ? undefined : value,
+  z.coerce.date({ error: "올바른 날짜를 입력해 주세요." }).optional(),
+);
+
 export const importLivestockHistorySchema = z.object({
   productId: required("제품", 10),
-  historyNumber: required("수입축산물 이력번호", 50),
-  importDate: z.coerce.date({ error: "수입일자를 입력해 주세요." }),
-  countryOfOrigin: required("원산지", 100),
-  supplierName: required("공급처", 150),
+  historyNumber: optional("수입축산물 이력번호", 50),
+  importDate: optionalDate,
+  countryOfOrigin: optional("원산지", 100),
+  supplierName: optional("공급처", 150),
   itemName: optional("품목명", 200),
   billOfLadingNumber: optional("B/L번호", 100),
   exporterName: optional("수출업체", 200),

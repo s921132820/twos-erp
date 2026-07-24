@@ -17,7 +17,7 @@ export function ProductForm({ product, onSuccess, onCancel }: { product?: Produc
   const { register, handleSubmit, formState: { errors: clientErrors } } = useForm<ProductInput>({
     resolver: zodResolver(productSchema),
     defaultValues: {
-      id: product?.id ?? "", code: product?.code ?? "", unit: product?.unit ?? "",
+      code: product?.code ?? "", unit: product?.unit ?? "",
       description: product?.description ?? "", name: product?.name ?? "", category: product?.category ?? "",
       material: product?.material ?? "",
     },
@@ -36,7 +36,6 @@ export function ProductForm({ product, onSuccess, onCancel }: { product?: Produc
     <form onSubmit={submit} className="space-y-5" noValidate aria-busy={pending}>
       {state.status === "error" && <div role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700">{state.message}</div>}
       <div className="grid gap-4 sm:grid-cols-2">
-        <label className="text-sm font-medium text-slate-700">제품 ID <span className="text-red-500">*</span><Input {...register("id")} className="mt-1.5" maxLength={10} /><FieldError messages={state.errors?.id ?? (clientErrors.id?.message ? [clientErrors.id.message] : undefined)} /></label>
         <label className="text-sm font-medium text-slate-700">품목보고번호 <span className="text-red-500">*</span><Input {...register("code")} className="mt-1.5" maxLength={20} /><FieldError messages={state.errors?.code ?? (clientErrors.code?.message ? [clientErrors.code.message] : undefined)} /></label>
         <label className="text-sm font-medium text-slate-700">제품명 <span className="text-red-500">*</span><Input {...register("name")} className="mt-1.5" maxLength={100} /><FieldError messages={state.errors?.name ?? (clientErrors.name?.message ? [clientErrors.name.message] : undefined)} /></label>
         <label className="text-sm font-medium text-slate-700">카테고리 <span className="text-red-500">*</span><Input {...register("category")} className="mt-1.5" maxLength={50} /><FieldError messages={state.errors?.category ?? (clientErrors.category?.message ? [clientErrors.category.message] : undefined)} /></label>
