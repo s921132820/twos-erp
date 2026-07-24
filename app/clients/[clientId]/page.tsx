@@ -2,6 +2,8 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { notFound } from "next/navigation";
 import { getClient } from "@/lib/clients/queries";
+import { Button } from "@/components/ui/button";
+import { DeleteClientButton } from "@/components/clients/delete-client-button";
 
 type Params = Promise<{ clientId: string }>;
 
@@ -16,7 +18,6 @@ export default async function ClientDetailPage({ params }: { params: Params }) {
   if (!client) notFound();
 
   const fields = [
-    ["거래처 ID", client.id],
     ["거래처명", client.companyName],
     ["수화인명", client.consigneeName],
     ["우편번호", display(client.postalCode)],
@@ -35,10 +36,9 @@ export default async function ClientDetailPage({ params }: { params: Params }) {
       <Link href="/clients" className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-blue-600">
         <ArrowLeft size={16} />거래처 목록으로 돌아가기
       </Link>
-      <div>
-        <p className="text-sm font-medium text-blue-600">거래처 상세</p>
-        <h2 className="mt-1 text-2xl font-bold text-slate-900">{client.companyName}</h2>
-        <p className="mt-1 font-mono text-sm text-slate-500">{client.id}</p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div><p className="text-sm font-medium text-blue-600">거래처 상세</p><h2 className="mt-1 text-2xl font-bold text-slate-900">{client.companyName}</h2></div>
+        <div className="flex gap-2"><Button asChild variant="outline"><Link href={`/clients/${encodeURIComponent(client.id)}/edit`}>수정</Link></Button><DeleteClientButton id={client.id} name={client.companyName} redirectToList /></div>
       </div>
       <dl className="grid overflow-hidden rounded-xl border border-slate-200 bg-white sm:grid-cols-2">
         {fields.map(([label, value]) => (
