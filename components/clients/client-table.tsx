@@ -3,6 +3,7 @@ import { Building2 } from "lucide-react";
 import type { Client } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { DeleteClientButton } from "./delete-client-button";
+import { CopyClientButton } from "./copy-client-button";
 
 const display = (value: string | null) => value?.trim() || "-";
 
@@ -41,7 +42,7 @@ export function ClientTable({ clients, page, limit }: { clients: Client[]; page:
                   <td><Link href={href} className={`${cellClass} whitespace-nowrap text-slate-600`}>{display(client.telephone)}</Link></td>
                   <td><Link href={href} className={`${cellClass} max-w-md truncate text-slate-600`}>{display(client.address)}</Link></td>
                   <td><Link href={href} className={`${cellClass} text-slate-600`}>{display(client.mainProduct)}</Link></td>
-                  <td className="px-5 py-3"><div className="flex items-center gap-1"><Button asChild size="sm" variant="outline"><Link href={`/clients/${encodeURIComponent(client.id)}/edit`}>수정</Link></Button><DeleteClientButton id={client.id} name={client.companyName} /></div></td>
+                  <td className="px-5 py-3"><div className="flex items-center gap-1"><Button asChild size="sm" variant="outline"><Link href={`/clients/${encodeURIComponent(client.id)}/edit`}>수정</Link></Button><DeleteClientButton id={client.id} name={client.companyName} /><CopyClientButton client={client} /></div></td>
                 </tr>
               );
             })}
