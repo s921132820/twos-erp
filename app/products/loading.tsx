@@ -1,3 +1,11 @@
-export default function Loading() {
-  return <div className="mx-auto max-w-[1500px] animate-pulse space-y-5" aria-label="제품 목록 불러오는 중"><div className="h-20 w-64 rounded bg-slate-200" /><div className="h-20 rounded-lg bg-slate-200" /><div className="h-80 rounded-lg bg-slate-200" /></div>;
+export default function ProductsLoading() {
+  return (
+    <div className="mx-auto max-w-[1500px] space-y-5" role="status" aria-live="polite">
+      <div className="h-20 animate-pulse rounded-lg bg-slate-100" />
+      <div className="h-20 animate-pulse rounded-lg bg-slate-100" />
+      <div className="flex min-h-72 items-center justify-center rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-500">
+        제품 목록을 불러오는 중입니다...
+      </div>
+    </div>
+  );
 }
