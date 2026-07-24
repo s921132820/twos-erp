@@ -38,7 +38,10 @@ function HistoryForm({ product, history, onSuccess, onCancel }: { product: Produ
     foreignSlaughterDate: history?.foreignSlaughterDate?.toISOString().slice(0, 10) ?? "",
     memo: history?.memo ?? "",
   });
-  useEffect(() => { if (state.status === "success") onSuccess(state.message); }, [state, onSuccess]);
+  useEffect(() => {
+    if (state.status === "success") onSuccess(state.message);
+    if (state.status === "error") toast.error(state.message);
+  }, [state, onSuccess]);
 
   const change = (field: keyof typeof values, value: string) => {
     if (field === "historyNumber") setLookupCompleted(history ? value === history.historyNumber : false);
