@@ -45,3 +45,20 @@ model ImportLivestockHistory {
   @@index([importDate], map: "idx_import_history_import_date")
   @@map("import_livestock_histories")
 }
+
+model Client {
+  id              String    @id @default(dbgenerated()) @map("client_id") @db.VarChar(6)
+  companyName     String    @map("company_name") @db.VarChar(100)
+  consigneeName   String    @map("consignee_name") @db.VarChar(100)
+  postalCode      String?   @map("postal_code") @db.VarChar(10)
+  address         String    @db.VarChar(255)
+  telephone       String?   @db.VarChar(20)
+  mobilePhone     String?   @map("mobile_phone") @db.VarChar(20)
+  mainProduct     String?   @map("main_product") @db.VarChar(255)
+  deliveryMessage String?   @map("delivery_message") @db.VarChar(500)
+  memo            String?   @db.Text
+  createdAt       DateTime? @default(now()) @map("created_at") @db.DateTime(0)
+  updatedAt       DateTime? @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
+
+  @@map("client")
+}

@@ -7,6 +7,8 @@ export function AppHeader() {
   const pathname = usePathname();
   const pageTitle = pathname.startsWith("/label-printer")
     ? "라벨 프린터"
+    : pathname.startsWith("/clients")
+    ? "거래처"
     : pathname.includes("/import-histories")
     ? "수입축산물 이력"
     : pathname.startsWith("/products")
