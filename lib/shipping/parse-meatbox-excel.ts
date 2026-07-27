@@ -3,7 +3,7 @@ import { cellDisplayValue, normalizeHeader, toIdentifierString, toSafeString } f
 import type { MeatboxOrderRow, ParsedOrderRow } from "./types";
 
 const REQUIRED_HEADERS = ["상품명", "받는사람", "받는사람연락처", "배송지 주소"] as const;
-const ALL_HEADERS = [...REQUIRED_HEADERS, "계근중량", "우편번호", "배송시주의사항"] as const;
+const ALL_HEADERS = [...REQUIRED_HEADERS, "상품번호", "계근중량", "우편번호", "배송시주의사항"] as const;
 type Header = (typeof ALL_HEADERS)[number];
 
 function findHeaderRow(sheet: XLSX.WorkSheet): { row: number; columns: Map<Header, number> } | null {
@@ -35,6 +35,7 @@ export function parseMeatboxWorkbook(workbook: XLSX.WorkBook): ParsedOrderRow<Me
     for (let rowIndex = header.row + 1; rowIndex <= range.e.r; rowIndex += 1) {
       const value = (name: Header) => readCell(sheet, rowIndex, header.columns.get(name));
       const row: MeatboxOrderRow = {
+        productNumber: toIdentifierString(value("상품번호")),
         productName: toSafeString(value("상품명")),
         measuredWeight: toSafeString(value("계근중량")),
         receiverName: toSafeString(value("받는사람")),

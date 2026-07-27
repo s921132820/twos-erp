@@ -7,6 +7,7 @@ export type ParsedOrderRow<T> = {
 };
 
 export type MeatboxOrderRow = {
+  productNumber: string;
   productName: string;
   measuredWeight: string;
   receiverName: string;

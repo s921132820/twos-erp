@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import * as XLSX from "xlsx";
 import XlsxPopulate from "xlsx-populate";
-import { combineProductNameAndWeight, convertMeatboxRowToHanjinRow, needsReview } from "../lib/shipping/convert-meatbox-to-hanjin";
+import { combineProductNameAndWeight, convertMeatboxRowToHanjinRow, getMeatboxProductLabel, needsReview, normalizeProductNumber } from "../lib/shipping/convert-meatbox-to-hanjin";
 import { createHanjinWorkbook, HANJIN_HEADERS } from "../lib/shipping/export-hanjin-excel";
 import { convertCoupangWingRowToHanjinRow } from "../lib/shipping/convert-coupang-wing-to-hanjin";
 import { detectMarketplace } from "../lib/shipping/marketplace-detector";
@@ -18,6 +18,16 @@ assert.equal(combineProductNameAndWeight("돈삼겹살", "10.35kg"), "돈삼겹�
 assert.equal(combineProductNameAndWeight("돈삼겹살", ""), "돈삼겹살");
 assert.equal(combineProductNameAndWeight("", "10.35"), "10.35");
 assert.equal(combineProductNameAndWeight(null, undefined), "");
+assert.equal(normalizeProductNumber(" 285058 "), "285058");
+assert.equal(getMeatboxProductLabel(285058), "(박피)");
+assert.equal(getMeatboxProductLabel(" 285055 "), "(암)");
+assert.equal(getMeatboxProductLabel("217548"), "(수)");
+assert.equal(getMeatboxProductLabel("999999"), "");
+assert.equal(getMeatboxProductLabel(undefined), "");
+assert.equal(combineProductNameAndWeight("염소 앞다리", "12.30kg", 285058), "염소 앞다리 / (박피) 12.30kg");
+assert.equal(combineProductNameAndWeight("염소 앞다리", "12.30kg", "285055"), "염소 앞다리 / (암) 12.30kg");
+assert.equal(combineProductNameAndWeight("염소 앞다리", "12.30kg", " 217548 "), "염소 앞다리 / (수) 12.30kg");
+assert.equal(combineProductNameAndWeight("염소 앞다리", "12.30kg", 999999), "염소 앞다리 / 12.30kg");
 for (const emptyMessage of [undefined, null, "", " ", "\n", "\r\n"]) assert.equal(normalizeDeliveryMessage(emptyMessage), DEFAULT_DELIVERY_MESSAGE);
 assert.equal(normalizeDeliveryMessage(" 문 앞에 놓아주세요 "), "문 앞에 놓아주세요");
 
@@ -72,6 +82,19 @@ assert.equal(needsReview(converted[1]!), true);
 assert.equal(converted[1]?.phone, "");
 assert.equal(converted[1]?.mobilePhone, "");
 assert.equal(converted[1]?.deliveryMessage, DEFAULT_DELIVERY_MESSAGE);
+
+const labeledMeatboxWorkbook = XLSX.utils.book_new();
+XLSX.utils.book_append_sheet(labeledMeatboxWorkbook, XLSX.utils.aoa_to_sheet([
+  ["상품번호", "상품명", "계근중량", "받는사람", "받는사람연락처", "배송지 주소"],
+  [285058, "염소 앞다리", "12.30kg", "수취인", "01012345678", "서울시"],
+  [" 285055 ", "염소 앞다리", "12.30kg", "수취인", "01012345678", "서울시"],
+  [217548, "염소 앞다리", "12.30kg", "수취인", "01012345678", "서울시"],
+  [999999, "염소 앞다리", "12.30kg", "수취인", "01012345678", "서울시"],
+]), "orders");
+const labeledRows = parseMeatboxWorkbook(labeledMeatboxWorkbook).map(({ row }) => convertMeatboxRowToHanjinRow(row));
+assert.deepEqual(labeledRows.map((row) => row.productName), [
+  "염소 앞다리 / (박피) 12.30kg", "염소 앞다리 / (암) 12.30kg", "염소 앞다리 / (수) 12.30kg", "염소 앞다리 / 12.30kg",
+]);
 
 const output = createHanjinWorkbook(converted);
 const sheet = output.Sheets["한진택배"]!;
