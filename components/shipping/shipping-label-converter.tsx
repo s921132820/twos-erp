@@ -61,16 +61,15 @@ export function ShippingLabelConverter() {
   const removeMarketplace = (marketplace: MarketplaceType) => { requestIds.current[marketplace] += 1; setMarketplaceState(marketplace, createInitialUploadState()); };
   const resetAll = () => { requestIds.current.meatbox += 1; requestIds.current["coupang-wing"] += 1; requestIds.current["smart-store"] += 1; setMeatboxState(createInitialUploadState()); setCoupangWingState(createInitialUploadState()); setSmartStoreState(createInitialUploadState()); };
 
-  return <div className="space-y-6">
-    <div><h2 className="text-2xl font-bold text-slate-900">택배 송장 변환</h2><p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-500">{"여러 판매처의 주문 파일을 등록한 뒤\n하나의 한진택배 엑셀 파일로 변환할 수 있습니다."}</p></div>
-    <div className="grid gap-5 xl:grid-cols-2">
+  return <div className="space-y-5">
+    <div><h2 className="text-2xl font-bold text-slate-900">택배 송장 변환</h2><p className="mt-1 text-sm text-slate-500">판매처별 주문 엑셀을 등록한 뒤 하나의 한진택배 파일로 변환합니다.</p></div>
+    <div className="grid grid-cols-1 items-stretch gap-3 md:grid-cols-2 lg:grid-cols-3">
       <MarketplaceUploadCard marketplace="meatbox" state={meatboxState} onFile={(file) => void handleFile("meatbox", file)} onRemove={() => removeMarketplace("meatbox")} />
       <MarketplaceUploadCard marketplace="coupang-wing" state={coupangWingState} onFile={(file) => void handleFile("coupang-wing", file)} onRemove={() => removeMarketplace("coupang-wing")} />
       <MarketplaceUploadCard marketplace="smart-store" state={smartStoreState} onFile={(file) => void handleFile("smart-store", file)} onRemove={() => removeMarketplace("smart-store")} />
     </div>
-    <section className="space-y-4"><div className="flex flex-wrap items-end justify-between gap-3"><div><h3 className="text-lg font-bold text-slate-900">통합 변환 결과</h3><p className="mt-1 text-sm text-slate-500">미트박스, 쿠팡윙, 스마트스토어 순서로 원본 행을 유지합니다.</p></div><Button type="button" variant="outline" onClick={resetAll} disabled={!meatboxState.file && !coupangWingState.file && !smartStoreState.file}><RotateCcw size={16} />전체 초기화</Button></div><ShippingSummary orders={combinedRows} /></section>
+    <section className="space-y-3"><div className="flex flex-wrap items-end justify-between gap-3"><div><h3 className="text-lg font-bold text-slate-900">통합 변환 결과</h3><p className="mt-1 text-sm text-slate-500">미트박스, 쿠팡윙, 스마트스토어 순서로 원본 행을 유지합니다.</p></div><div className="flex flex-wrap gap-2"><Button type="button" variant="outline" onClick={resetAll} disabled={!meatboxState.file && !coupangWingState.file && !smartStoreState.file}><RotateCcw size={16} />전체 초기화</Button><ShippingDownloadButton orders={combinedRows} isLoading={isLoading} /></div></div><ShippingSummary orders={combinedRows} /></section>
     {warningCount > 0 && <div className="flex gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-800"><AlertTriangle className="mt-0.5 shrink-0" size={17} /><span>확인 필요한 주문이 {warningCount}건 있습니다. 미리보기에서 누락된 정보를 확인해주세요.</span></div>}
     <ShippingPreviewTable orders={combinedRows} />
-    <div className="flex justify-end"><ShippingDownloadButton orders={combinedRows} isLoading={isLoading} /></div>
   </div>;
 }
