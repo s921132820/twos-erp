@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import * as XLSX from "xlsx";
+import XlsxPopulate from "xlsx-populate";
 import { combineProductNameAndWeight, convertMeatboxRowToHanjinRow, needsReview } from "../lib/shipping/convert-meatbox-to-hanjin";
 import { createHanjinWorkbook, HANJIN_HEADERS } from "../lib/shipping/export-hanjin-excel";
 import { convertCoupangWingRowToHanjinRow } from "../lib/shipping/convert-coupang-wing-to-hanjin";
@@ -7,6 +8,7 @@ import { detectMarketplace } from "../lib/shipping/marketplace-detector";
 import { parseCoupangWingWorkbook } from "../lib/shipping/parse-coupang-wing-excel";
 import { parseMarketplaceExcel } from "../lib/shipping/parse-marketplace-excel";
 import { parseMeatboxWorkbook } from "../lib/shipping/parse-meatbox-excel";
+import { parseEncryptedSmartStoreExcel } from "../lib/shipping/parse-encrypted-smart-store-excel";
 
 assert.equal(combineProductNameAndWeight("돈삼겹살", "10.35kg"), "돈삼겹살 / 10.35kg");
 assert.equal(combineProductNameAndWeight("돈삼겹살", ""), "돈삼겹살");
@@ -117,4 +119,51 @@ assert.equal(combinedData.length - 1, 5);
 assert.equal(combinedData[0]?.includes("판매처"), false);
 assert.equal(combinedData[0]?.includes("원본 행"), false);
 
-console.log("shipping self-test: all assertions passed");
+async function testSmartStoreEncryption() {
+const smartStoreWorkbook = XLSX.utils.book_new();
+XLSX.utils.book_append_sheet(smartStoreWorkbook, XLSX.utils.aoa_to_sheet([["수취인명", "상품명", "통합배송지", "구매자연락처"]]), "안내");
+XLSX.utils.book_append_sheet(smartStoreWorkbook, XLSX.utils.aoa_to_sheet([
+  ["스마트스토어 발주 목록"],
+  [" 수취인 명 ", "상품명", "통합\n배송지", "구매자 연락처", "우편번호", "배송 메시지"],
+  ["박하나", "스마트 상품1", "대전시", "010-1111-2222", "01234", "문 앞"],
+  ["박둘", "스마트 상품2", "대구시", "01033334444", "23456", ""],
+  ["박셋", "스마트 상품3", "광주시", "01055556666", "34567", "경비실"],
+  ["", "스마트 상품4", "", "01077778888", "", ""],
+  ["", "", "", "", "", ""],
+]), "주문");
+const smartPlain = XLSX.write(smartStoreWorkbook, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+const populateWorkbook = await XlsxPopulate.fromDataAsync(smartPlain);
+const smartEncrypted = await populateWorkbook.outputAsync({ type: "arraybuffer", password: "1234" });
+assert.ok(smartEncrypted instanceof ArrayBuffer);
+const sourcedSmartStore = await parseEncryptedSmartStoreExcel(smartEncrypted, "smart-store.xlsx");
+assert.equal(sourcedSmartStore.length, 4);
+assert.equal(sourcedSmartStore[0]?.source, "smart-store");
+assert.equal(sourcedSmartStore[0]?.sourceRowNumber, 3);
+assert.equal(sourcedSmartStore[0]?.receiverName, "박하나");
+assert.equal(sourcedSmartStore[0]?.productName, "스마트 상품1");
+assert.equal(sourcedSmartStore[0]?.address, "대전시");
+assert.equal(sourcedSmartStore[0]?.mobilePhone, "010-1111-2222");
+assert.equal(sourcedSmartStore[0]?.postalCode, "01234");
+assert.equal(sourcedSmartStore[0]?.deliveryMessage, "문 앞");
+assert.equal(sourcedSmartStore[3]?.validation.isValid, false);
+
+const wrongPasswordWorkbook = await XlsxPopulate.fromDataAsync(smartPlain);
+const wrongPasswordEncrypted = await wrongPasswordWorkbook.outputAsync({ type: "arraybuffer", password: "9999" });
+assert.ok(wrongPasswordEncrypted instanceof ArrayBuffer);
+await assert.rejects(() => parseEncryptedSmartStoreExcel(wrongPasswordEncrypted, "wrong.xlsx"), /비밀번호를 해제하지 못했습니다/);
+
+const allMarketplaces = [...sourcedMeatbox, ...sourcedCoupang, ...sourcedSmartStore];
+assert.equal(allMarketplaces.length, 9);
+assert.deepEqual(allMarketplaces.map((row) => row.source), ["meatbox", "meatbox", "meatbox", "coupang-wing", "coupang-wing", "smart-store", "smart-store", "smart-store", "smart-store"]);
+const allData = XLSX.utils.sheet_to_json<Array<string | number>>(createHanjinWorkbook(allMarketplaces).Sheets["한진택배"]!, { header: 1, raw: true, defval: "" });
+assert.equal(allData.length - 1, 9);
+assert.equal(allData[6]?.[0], "박하나");
+assert.equal(allData[6]?.[3], "");
+assert.equal(allData[6]?.[5], 1);
+assert.equal(allData[6]?.[8], "스마트 상품1");
+}
+
+void testSmartStoreEncryption().then(() => console.log("shipping self-test: all assertions passed")).catch((error: unknown) => {
+  console.error(error instanceof Error ? error.message : "shipping self-test failed");
+  process.exitCode = 1;
+});

@@ -36,6 +36,7 @@
     "sonner": "latest",
     "tailwind-merge": "latest",
     "xlsx": "^0.18.5",
+    "xlsx-populate": "^1.21.0",
     "zod": "latest"
   },
   "devDependencies": {

@@ -25,6 +25,7 @@ export function parseMarketplaceExcel(data: ArrayBuffer, marketplace: Marketplac
   switch (marketplace) {
     case "meatbox": return parseMeatboxWorkbook(workbook).map(({ row, sourceRowNumber }) => withShippingSource(convertMeatboxRowToHanjinRow(row), marketplace, sourceFileName, sourceRowNumber));
     case "coupang-wing": return parseCoupangWingWorkbook(workbook).map(({ row, sourceRowNumber }) => withShippingSource(convertCoupangWingRowToHanjinRow(row), marketplace, sourceFileName, sourceRowNumber));
+    case "smart-store": throw new Error("스마트스토어 파일은 암호화 전용 파서를 사용해야 합니다.");
     default: return assertNever(marketplace);
   }
 }

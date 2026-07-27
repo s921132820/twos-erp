@@ -5,16 +5,21 @@ import type { MarketplaceType } from "./types";
 export const MARKETPLACE_LABELS: Record<MarketplaceType, string> = {
   meatbox: "미트박스",
   "coupang-wing": "쿠팡윙",
+  "smart-store": "스마트스토어",
 };
 
 const SIGNATURES: Record<MarketplaceType, readonly string[]> = {
   meatbox: ["상품명", "받는사람", "받는사람연락처", "배송지 주소"],
   "coupang-wing": ["노출상품명(옵션명)", "수취인이름", "수취인전화번호", "수취인 주소"],
+  "smart-store": ["수취인명", "상품명", "통합배송지", "구매자연락처"],
 };
 
 function canonicalHeader(value: string): string {
   if (value === "노출상품명 (옵션명)" || value === "노출상품명") return "노출상품명(옵션명)";
   if (value === "수취인 이름") return "수취인이름";
+  if (value === "수취인 명") return "수취인명";
+  if (value === "통합 배송지") return "통합배송지";
+  if (value === "구매자 연락처") return "구매자연락처";
   if (value === "수취인 전화번호") return "수취인전화번호";
   if (value === "수취인주소") return "수취인 주소";
   return value;

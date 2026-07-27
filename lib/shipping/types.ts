@@ -1,4 +1,4 @@
-export type MarketplaceType = "meatbox" | "coupang-wing";
+export type MarketplaceType = "meatbox" | "coupang-wing" | "smart-store";
 export type MarketplaceSource = MarketplaceType;
 
 export type ParsedOrderRow<T> = {
@@ -22,6 +22,15 @@ export type CoupangWingOrderRow = {
   receiverPhoneNumber: string;
   postalCode: string;
   receiverAddress: string;
+  deliveryMessage: string;
+};
+
+export type SmartStoreOrderRow = {
+  receiverName: string;
+  productName: string;
+  integratedAddress: string;
+  buyerPhoneNumber: string;
+  postalCode: string;
   deliveryMessage: string;
 };
 
@@ -56,4 +65,5 @@ export type MarketplaceUploadState = {
   rows: ConvertedShippingRow[];
   error: string | null;
   isLoading: boolean;
+  status: "idle" | "decrypting" | "parsing" | "success" | "error";
 };
