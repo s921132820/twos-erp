@@ -7,39 +7,39 @@ datasource db {
 }
 
 model Product {
-  id          String    @id @default(dbgenerated()) @map("p_id") @db.VarChar(10)
-  code        String    @map("report_number") @db.VarChar(20)
-  unit        String    @map("product_type") @db.VarChar(50)
-  description String    @map("expiration_period") @db.VarChar(100)
-  name        String    @map("product_name") @db.VarChar(100)
-  category    String    @db.VarChar(50)
-  material    String?   @db.Text
-  createdAt   DateTime? @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt   DateTime? @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  id                       String                   @id @map("p_id") @db.VarChar(10)
+  code                     String                   @map("report_number") @db.VarChar(20)
+  unit                     String                   @map("product_type") @db.VarChar(50)
+  description              String                   @map("expiration_period") @db.VarChar(100)
+  name                     String                   @map("product_name") @db.VarChar(100)
+  category                 String                   @db.VarChar(50)
+  material                 String?                  @db.Text
+  createdAt                DateTime?                @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt                DateTime?                @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
   importLivestockHistories ImportLivestockHistory[]
 
   @@map("products")
 }
 
 model ImportLivestockHistory {
-  id              Int       @id @default(autoincrement())
-  productId       String    @map("product_id") @db.VarChar(10)
-  historyNumber   String?   @unique(map: "uk_import_history_number") @map("history_number") @db.VarChar(50)
-  importDate      DateTime? @map("import_date") @db.Date
-  countryOfOrigin String?   @map("country_of_origin") @db.VarChar(100)
-  supplierName    String?   @map("supplier_name") @db.VarChar(150)
-  itemName        String?   @map("item_name") @db.VarChar(200)
-  billOfLadingNumber String? @map("bill_of_lading_number") @db.VarChar(100)
-  exporterName    String?   @map("exporter_name") @db.VarChar(200)
-  foreignSlaughterhouse String? @map("foreign_slaughterhouse") @db.VarChar(500)
-  foreignProcessingPlant String? @map("foreign_processing_plant") @db.VarChar(500)
-  partNameCode    String?   @map("part_name_code") @db.VarChar(200)
-  foreignSlaughterDate DateTime? @map("foreign_slaughter_date") @db.Date
-  memo            String?   @db.Text
-  isActive        Boolean   @default(true) @map("is_active")
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
-  product         Product   @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_import_history_product")
+  id                     Int       @id @default(autoincrement())
+  productId              String    @map("product_id") @db.VarChar(10)
+  historyNumber          String?   @unique(map: "uk_import_history_number") @map("history_number") @db.VarChar(50)
+  importDate             DateTime? @map("import_date") @db.Date
+  countryOfOrigin        String?   @map("country_of_origin") @db.VarChar(100)
+  supplierName           String?   @map("supplier_name") @db.VarChar(150)
+  itemName               String?   @map("item_name") @db.VarChar(200)
+  billOfLadingNumber     String?   @map("bill_of_lading_number") @db.VarChar(100)
+  exporterName           String?   @map("exporter_name") @db.VarChar(200)
+  foreignSlaughterhouse  String?   @map("foreign_slaughterhouse") @db.VarChar(500)
+  foreignProcessingPlant String?   @map("foreign_processing_plant") @db.VarChar(500)
+  partNameCode           String?   @map("part_name_code") @db.VarChar(200)
+  foreignSlaughterDate   DateTime? @map("foreign_slaughter_date") @db.Date
+  memo                   String?   @db.Text
+  isActive               Boolean   @default(true) @map("is_active")
+  createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt              DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  product                Product   @relation(fields: [productId], references: [id], map: "fk_import_history_product")
 
   @@index([productId], map: "idx_import_history_product_id")
   @@index([importDate], map: "idx_import_history_import_date")
@@ -47,11 +47,11 @@ model ImportLivestockHistory {
 }
 
 model Client {
-  id              String    @id @default(dbgenerated()) @map("client_id") @db.VarChar(6)
+  id              String    @id @map("client_id") @db.VarChar(6)
   companyName     String    @map("company_name") @db.VarChar(100)
   consigneeName   String    @map("consignee_name") @db.VarChar(100)
   postalCode      String?   @map("postal_code") @db.VarChar(10)
-  address         String    @db.VarChar(255)
+  address         String?   @db.VarChar(255)
   telephone       String?   @db.VarChar(20)
   mobilePhone     String?   @map("mobile_phone") @db.VarChar(20)
   mainProduct     String?   @map("main_product") @db.VarChar(255)
@@ -61,4 +61,14 @@ model Client {
   updatedAt       DateTime? @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
 
   @@map("client")
+}
+
+model client_id_sequence {
+  sequence_name String @id @db.VarChar(50)
+  next_value    BigInt @db.UnsignedBigInt
+}
+
+model product_id_sequence {
+  sequence_name String @id @db.VarChar(50)
+  next_value    BigInt @db.UnsignedBigInt
 }

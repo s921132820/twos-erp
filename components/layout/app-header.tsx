@@ -5,7 +5,9 @@ import { usePathname } from "next/navigation";
 
 export function AppHeader() {
   const pathname = usePathname();
-  const pageTitle = pathname.startsWith("/label-printer")
+  const pageTitle = pathname.startsWith("/shipping-labels")
+    ? "택배 송장"
+    : pathname.startsWith("/label-printer")
     ? "라벨 프린터"
     : pathname.startsWith("/clients")
     ? "거래처"

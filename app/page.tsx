@@ -1,11 +1,20 @@
 import Link from "next/link";
 import { ArrowRight, Boxes, FolderTree, PackageSearch } from "lucide-react";
+import { DashboardDatabaseError } from "@/components/dashboard/dashboard-database-error";
 import { getDashboardSummary } from "@/lib/dashboard/queries";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const { productCount, categoryCount, recentProducts } = await getDashboardSummary();
+  let summary: Awaited<ReturnType<typeof getDashboardSummary>>;
+  try {
+    summary = await getDashboardSummary();
+  } catch (error) {
+    const details = error instanceof Error ? error.stack ?? error.message : String(error);
+    process.stdout.write(`[Dashboard database query failed]\n${details}\n`);
+    return <DashboardDatabaseError />;
+  }
+  const { productCount, categoryCount, recentProducts } = summary;
 
   return (
     <div className="mx-auto max-w-[1500px] space-y-6">
