@@ -6,5 +6,10 @@ export function getMissingReviewFields(row: HanjinShippingRow): string[] {
 
 export function withShippingSource(row: HanjinShippingRow, source: MarketplaceSource, sourceFileName: string, sourceRowNumber: number): ConvertedShippingRow {
   const missingFields = getMissingReviewFields(row);
-  return { ...row, source, sourceFileName, sourceRowNumber, validation: { isValid: missingFields.length === 0, missingFields } };
+  return { ...row, rowKey: `${source}:${sourceFileName}:${sourceRowNumber}`, source, sourceFileName, sourceRowNumber, validation: { isValid: missingFields.length === 0, missingFields } };
+}
+
+export function validateShippingRow(row: HanjinShippingRow) {
+  const missingFields = getMissingReviewFields(row);
+  return { isValid: missingFields.length === 0, missingFields };
 }

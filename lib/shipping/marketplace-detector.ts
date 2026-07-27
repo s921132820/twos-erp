@@ -1,11 +1,12 @@
 import * as XLSX from "xlsx";
 import { cellDisplayValue, normalizeHeader } from "./excel-utils";
-import type { MarketplaceType } from "./types";
+import type { MarketplaceSource, MarketplaceType } from "./types";
 
-export const MARKETPLACE_LABELS: Record<MarketplaceType, string> = {
+export const MARKETPLACE_LABELS: Record<MarketplaceSource, string> = {
   meatbox: "미트박스",
   "coupang-wing": "쿠팡윙",
   "smart-store": "스마트스토어",
+  manual: "수동 입력",
 };
 
 const SIGNATURES: Record<MarketplaceType, readonly string[]> = {

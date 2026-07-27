@@ -1,5 +1,5 @@
 export type MarketplaceType = "meatbox" | "coupang-wing" | "smart-store";
-export type MarketplaceSource = MarketplaceType;
+export type MarketplaceSource = MarketplaceType | "manual";
 
 export type ParsedOrderRow<T> = {
   row: T;
@@ -50,6 +50,7 @@ export type HanjinShippingRow = {
 };
 
 export type ConvertedShippingRow = HanjinShippingRow & {
+  rowKey: string;
   source: MarketplaceSource;
   sourceFileName: string;
   sourceRowNumber: number;
@@ -57,6 +58,29 @@ export type ConvertedShippingRow = HanjinShippingRow & {
     isValid: boolean;
     missingFields: string[];
   };
+};
+
+export type ManualShippingForm = Omit<HanjinShippingRow, "emptyColumn1" | "emptyColumn2" | "emptyColumn3"> & {
+  selectedClientId: string | null;
+  phoneWasManuallyEdited: boolean;
+};
+
+export type ManualShippingRow = ConvertedShippingRow & {
+  source: "manual";
+  id: string;
+  selectedClientId: string | null;
+};
+
+export type ShippingClientSearchResult = {
+  id: string;
+  companyName: string;
+  consigneeName: string;
+  postalCode: string | null;
+  address: string | null;
+  phone: string | null;
+  mobilePhone: string | null;
+  primaryProduct: string | null;
+  deliveryMessage: string | null;
 };
 
 export type MarketplaceUploadState = {
