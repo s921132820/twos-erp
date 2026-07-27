@@ -83,6 +83,12 @@ export type ShippingClientSearchResult = {
   deliveryMessage: string | null;
 };
 
+export type ProductQuantitySummary = {
+  key: string;
+  productName: string;
+  quantity: number;
+};
+
 export type MarketplaceUploadState = {
   file: File | null;
   fileName: string;

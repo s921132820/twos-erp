@@ -1,19 +1,20 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { AlertTriangle, Plus, RotateCcw } from "lucide-react";
+import { Plus, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { MARKETPLACE_LABELS } from "@/lib/shipping/marketplace-detector";
 import { createInitialManualForm, createManualShippingRow } from "@/lib/shipping/manual-shipping";
 import { parseMarketplaceExcel } from "@/lib/shipping/parse-marketplace-excel";
 import { parseEncryptedSmartStoreExcel } from "@/lib/shipping/parse-encrypted-smart-store-excel";
+import { groupShippingRowsByProduct } from "@/lib/shipping/product-summary";
 import type { ConvertedShippingRow, HanjinShippingRow, ManualShippingForm, ManualShippingRow, MarketplaceType, MarketplaceUploadState } from "@/lib/shipping/types";
 import { validateShippingRow } from "@/lib/shipping/validation";
 import { ManualOrderDialog, type ManualOrderDialogMode } from "./manual-order-dialog";
 import { MarketplaceUploadCard } from "./marketplace-upload-card";
 import { ShippingDownloadButton } from "./shipping-download-button";
-import { ShippingPreviewTable } from "./shipping-preview-table";
+import { ShippingResultTabs } from "./shipping-result-tabs";
 import { ShippingRowEditDialog } from "./shipping-row-edit-dialog";
 import { ShippingSummary } from "./shipping-summary";
 
@@ -35,7 +36,7 @@ export function ShippingLabelConverter() {
   const baseRows = useMemo(() => [...meatboxState.rows, ...coupangWingState.rows, ...smartStoreState.rows, ...manualRows], [meatboxState.rows, coupangWingState.rows, smartStoreState.rows, manualRows]);
   const allRows = useMemo(() => baseRows.map((row) => { const changed = overrides[row.rowKey]; return changed ? { ...row, ...changed, validation: validateShippingRow(changed) } : row; }), [baseRows, overrides]);
   const activeRows = useMemo(() => allRows.filter((row) => !excludedRowKeys.has(row.rowKey)), [allRows, excludedRowKeys]);
-  const warningCount = activeRows.filter((row) => !row.validation.isValid).length;
+  const groupedProducts = useMemo(() => groupShippingRowsByProduct(activeRows), [activeRows]);
   const isLoading = meatboxState.isLoading || coupangWingState.isLoading || smartStoreState.isLoading;
 
   const setMarketplaceState = (marketplace: MarketplaceType, state: MarketplaceUploadState) => {
@@ -87,8 +88,7 @@ export function ShippingLabelConverter() {
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-2xl font-bold text-slate-900">택배 송장 변환</h2><p className="mt-1 text-sm text-slate-500">판매처 주문과 수동 주문을 한진택배 송장 엑셀로 통합합니다.</p></div><Button type="button" className="w-full sm:w-auto" onClick={openCreateManual}><Plus size={16} />수동 주문 추가</Button></div>
     <div className="grid grid-cols-1 items-stretch gap-3 md:grid-cols-2 lg:grid-cols-3"><MarketplaceUploadCard marketplace="meatbox" state={meatboxState} onFile={(file) => void handleFile("meatbox", file)} onRemove={() => removeMarketplace("meatbox")} /><MarketplaceUploadCard marketplace="coupang-wing" state={coupangWingState} onFile={(file) => void handleFile("coupang-wing", file)} onRemove={() => removeMarketplace("coupang-wing")} /><MarketplaceUploadCard marketplace="smart-store" state={smartStoreState} onFile={(file) => void handleFile("smart-store", file)} onRemove={() => removeMarketplace("smart-store")} /></div>
     <section className="space-y-3"><div className="flex flex-wrap items-end justify-between gap-3"><div><h3 className="text-lg font-bold text-slate-900">통합 변환 결과</h3><p className="mt-1 text-sm text-slate-500">제외된 엑셀 행은 목록에 남지만 요약과 다운로드에는 포함되지 않습니다.</p></div><div className="flex flex-wrap gap-2"><Button type="button" variant="outline" onClick={resetAll}><RotateCcw size={16} />전체 초기화</Button><ShippingDownloadButton orders={activeRows} isLoading={isLoading} /></div></div><ShippingSummary orders={activeRows} /></section>
-    {warningCount > 0 && <div className="flex gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-800"><AlertTriangle className="mt-0.5 shrink-0" size={17} /><span>확인이 필요한 주문이 {warningCount}건 있습니다. 미리보기에서 누락 정보를 확인하거나 수정해 주세요.</span></div>}
-    <ShippingPreviewTable orders={allRows} excludedRowKeys={excludedRowKeys} onEdit={openEdit} onToggleExclude={toggleExclude} onDeleteManual={deleteManual} />
+    <ShippingResultTabs finalRows={activeRows} allRows={allRows} groupedProducts={groupedProducts} excludedRowKeys={excludedRowKeys} onEdit={openEdit} onToggleExclude={toggleExclude} onDeleteManual={deleteManual} />
     <ShippingRowEditDialog row={editingRow} onClose={() => setEditingRow(null)} onSave={saveEdit} />
     <ManualOrderDialog key={`${manualDialog.mode}-${manualDialog.editingRowId ?? "new"}-${manualDialog.open}`} open={manualDialog.open} mode={manualDialog.mode} initialValues={manualDialog.initialValues} onOpenChange={(open) => { if (!open) closeManualDialog(); }} onSubmit={submitManualDialog} />
   </div>;

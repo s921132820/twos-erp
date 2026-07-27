@@ -12,6 +12,7 @@ import { parseEncryptedSmartStoreExcel } from "../lib/shipping/parse-encrypted-s
 import { DEFAULT_DELIVERY_MESSAGE } from "../lib/shipping/constants";
 import { normalizeDeliveryMessage } from "../lib/shipping/excel-utils";
 import { createInitialManualForm, createManualShippingRow, normalizePackageQuantity } from "../lib/shipping/manual-shipping";
+import { groupShippingRowsByProduct, normalizeProductNameForGrouping } from "../lib/shipping/product-summary";
 
 assert.equal(combineProductNameAndWeight("돈삼겹살", "10.35kg"), "돈삼겹살 / 10.35kg");
 assert.equal(combineProductNameAndWeight("돈삼겹살", ""), "돈삼겹살");
@@ -32,6 +33,18 @@ assert.equal(manual.packageQuantity, 1);
 assert.equal(manual.source, "manual");
 assert.equal(normalizePackageQuantity(2), 2);
 assert.equal(normalizePackageQuantity(-1), 1);
+assert.equal(normalizeProductNameForGrouping("  LA갈비\n  선물세트  "), "LA갈비 선물세트");
+const productGroups = groupShippingRowsByProduct([
+  { ...manual, rowKey: "summary-1", productName: " LA갈비 ", packageQuantity: 1, source: "manual" },
+  { ...manual, rowKey: "summary-2", productName: "la갈비", packageQuantity: 2, source: "meatbox" },
+  { ...manual, rowKey: "summary-3", productName: "LA갈비\n", packageQuantity: 1, source: "coupang-wing" },
+  { ...manual, rowKey: "summary-4", productName: "", packageQuantity: 1, source: "smart-store" },
+]);
+assert.equal(productGroups.length, 2);
+assert.equal(productGroups[0]?.productName, "LA갈비");
+assert.equal(productGroups[0]?.quantity, 4);
+assert.equal(productGroups[1]?.productName, "물품명 미입력");
+assert.equal(productGroups[1]?.quantity, 1);
 
 const input = XLSX.utils.book_new();
 XLSX.utils.book_append_sheet(input, XLSX.utils.aoa_to_sheet([["안내"]]), "안내");
