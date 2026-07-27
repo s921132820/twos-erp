@@ -1,4 +1,5 @@
 import type { CellObject } from "xlsx";
+import { DEFAULT_DELIVERY_MESSAGE } from "./constants";
 
 export function toSafeString(value: unknown): string {
   if (value === null || value === undefined) return "";
@@ -12,6 +13,10 @@ export function toIdentifierString(value: unknown): string {
 
 export const normalizePostalCode = toIdentifierString;
 export const normalizePhoneNumber = toIdentifierString;
+
+export function normalizeDeliveryMessage(value: unknown): string {
+  return toSafeString(value) || DEFAULT_DELIVERY_MESSAGE;
+}
 
 export function normalizeHeader(value: unknown): string {
   return toSafeString(value).replace(/\r?\n/g, " ").replace(/\s+/g, " ").trim();

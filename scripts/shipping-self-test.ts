@@ -9,11 +9,15 @@ import { parseCoupangWingWorkbook } from "../lib/shipping/parse-coupang-wing-exc
 import { parseMarketplaceExcel } from "../lib/shipping/parse-marketplace-excel";
 import { parseMeatboxWorkbook } from "../lib/shipping/parse-meatbox-excel";
 import { parseEncryptedSmartStoreExcel } from "../lib/shipping/parse-encrypted-smart-store-excel";
+import { DEFAULT_DELIVERY_MESSAGE } from "../lib/shipping/constants";
+import { normalizeDeliveryMessage } from "../lib/shipping/excel-utils";
 
 assert.equal(combineProductNameAndWeight("돈삼겹살", "10.35kg"), "돈삼겹살 / 10.35kg");
 assert.equal(combineProductNameAndWeight("돈삼겹살", ""), "돈삼겹살");
 assert.equal(combineProductNameAndWeight("", "10.35"), "10.35");
 assert.equal(combineProductNameAndWeight(null, undefined), "");
+for (const emptyMessage of [undefined, null, "", " ", "\n", "\r\n"]) assert.equal(normalizeDeliveryMessage(emptyMessage), DEFAULT_DELIVERY_MESSAGE);
+assert.equal(normalizeDeliveryMessage(" 문 앞에 놓아주세요 "), "문 앞에 놓아주세요");
 
 const input = XLSX.utils.book_new();
 XLSX.utils.book_append_sheet(input, XLSX.utils.aoa_to_sheet([["안내"]]), "안내");
@@ -31,19 +35,24 @@ assert.equal(parsed[0]?.row.postalCode, "01234");
 assert.equal(parsed[0]?.sourceRowNumber, 3);
 const converted = parsed.map(({ row }) => convertMeatboxRowToHanjinRow(row));
 assert.equal(converted[0]?.productName, "[호주] 염소갈비 / 10.25kg");
-assert.equal(converted[0]?.phone, "");
+assert.equal(converted[0]?.phone, "01012345678");
+assert.equal(converted[0]?.phone, converted[0]?.mobilePhone);
 assert.equal(converted[0]?.mobilePhone, "01012345678");
 assert.equal(converted[0]?.packageQuantity, 1);
 assert.equal(converted[0]?.deliveryMessage, "문 앞");
 assert.equal(needsReview(converted[0]!), false);
 assert.equal(needsReview(converted[1]!), true);
+assert.equal(converted[1]?.phone, "");
+assert.equal(converted[1]?.mobilePhone, "");
+assert.equal(converted[1]?.deliveryMessage, DEFAULT_DELIVERY_MESSAGE);
 
 const output = createHanjinWorkbook(converted);
 const sheet = output.Sheets["한진택배"]!;
 const data = XLSX.utils.sheet_to_json<Array<string | number>>(sheet, { header: 1, raw: true, defval: "" });
 assert.deepEqual(data[0], HANJIN_HEADERS);
 assert.equal(data[1]?.length, 12);
-assert.equal(data[1]?.[3], "");
+assert.equal(data[1]?.[3], "01012345678");
+assert.equal(data[1]?.[3], data[1]?.[4]);
 assert.equal(data[1]?.[5], 1);
 assert.equal(data[1]?.[6], "");
 assert.equal(data[1]?.[7], "");
@@ -77,7 +86,9 @@ assert.equal(coupangConverted[0]?.mobilePhone, "010-1234-5678");
 assert.equal(coupangConverted[0]?.address, "서울시 강남구");
 assert.equal(coupangConverted[0]?.productName, "육미가 염소탕 600g 5팩");
 assert.equal(coupangConverted[0]?.deliveryMessage, "문 앞에 놓아주세요");
-assert.equal(coupangConverted[0]?.phone, "");
+assert.equal(coupangConverted[0]?.phone, "010-1234-5678");
+assert.equal(coupangConverted[0]?.phone, coupangConverted[0]?.mobilePhone);
+assert.equal(coupangConverted[1]?.deliveryMessage, DEFAULT_DELIVERY_MESSAGE);
 assert.equal(coupangConverted[0]?.packageQuantity, 1);
 
 const coupangArray = XLSX.write(coupangInput, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
@@ -91,7 +102,8 @@ const coupangOutput = createHanjinWorkbook(coupangConverted);
 const coupangData = XLSX.utils.sheet_to_json<Array<string | number>>(coupangOutput.Sheets["한진택배"]!, { header: 1, raw: true, defval: "" });
 assert.equal(coupangData[1]?.[0], "홍길동");
 assert.equal(coupangData[1]?.[1], "01234");
-assert.equal(coupangData[1]?.[3], "");
+assert.equal(coupangData[1]?.[3], "010-1234-5678");
+assert.equal(coupangData[1]?.[3], coupangData[1]?.[4]);
 assert.equal(coupangData[1]?.[4], "010-1234-5678");
 assert.equal(coupangData[1]?.[5], 1);
 assert.equal(coupangData[1]?.[6], "");
@@ -145,6 +157,8 @@ assert.equal(sourcedSmartStore[0]?.address, "대전시");
 assert.equal(sourcedSmartStore[0]?.mobilePhone, "010-1111-2222");
 assert.equal(sourcedSmartStore[0]?.postalCode, "01234");
 assert.equal(sourcedSmartStore[0]?.deliveryMessage, "문 앞");
+assert.equal(sourcedSmartStore[0]?.phone, sourcedSmartStore[0]?.mobilePhone);
+assert.equal(sourcedSmartStore[1]?.deliveryMessage, DEFAULT_DELIVERY_MESSAGE);
 assert.equal(sourcedSmartStore[3]?.validation.isValid, false);
 
 const wrongPasswordWorkbook = await XlsxPopulate.fromDataAsync(smartPlain);
@@ -158,9 +172,12 @@ assert.deepEqual(allMarketplaces.map((row) => row.source), ["meatbox", "meatbox"
 const allData = XLSX.utils.sheet_to_json<Array<string | number>>(createHanjinWorkbook(allMarketplaces).Sheets["한진택배"]!, { header: 1, raw: true, defval: "" });
 assert.equal(allData.length - 1, 9);
 assert.equal(allData[6]?.[0], "박하나");
-assert.equal(allData[6]?.[3], "");
+assert.equal(allData[6]?.[3], "010-1111-2222");
+assert.equal(allData[6]?.[3], allData[6]?.[4]);
 assert.equal(allData[6]?.[5], 1);
 assert.equal(allData[6]?.[8], "스마트 상품1");
+assert.equal(allData[7]?.[10], DEFAULT_DELIVERY_MESSAGE);
+for (const row of allData.slice(1)) assert.equal(row[3], row[4]);
 }
 
 void testSmartStoreEncryption().then(() => console.log("shipping self-test: all assertions passed")).catch((error: unknown) => {
