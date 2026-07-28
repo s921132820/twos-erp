@@ -6,6 +6,7 @@ export const MARKETPLACE_LABELS: Record<MarketplaceSource, string> = {
   meatbox: "미트박스",
   "coupang-wing": "쿠팡윙",
   "smart-store": "스마트스토어",
+  meatfriends: "미트프렌즈",
   manual: "수동 입력",
 };
 
@@ -13,6 +14,7 @@ const SIGNATURES: Record<MarketplaceType, readonly string[]> = {
   meatbox: ["상품명", "받는사람", "받는사람연락처", "배송지 주소"],
   "coupang-wing": ["노출상품명(옵션명)", "수취인이름", "수취인전화번호", "수취인 주소"],
   "smart-store": ["수취인명", "상품명", "통합배송지", "구매자연락처"],
+  meatfriends: ["수취인명", "기본연락처", "우편번호", "주소", "상품명"],
 };
 
 function canonicalHeader(value: string): string {

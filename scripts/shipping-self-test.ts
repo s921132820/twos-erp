@@ -9,6 +9,9 @@ import { parseCoupangWingWorkbook } from "../lib/shipping/parse-coupang-wing-exc
 import { parseMarketplaceExcel } from "../lib/shipping/parse-marketplace-excel";
 import { parseMeatboxWorkbook } from "../lib/shipping/parse-meatbox-excel";
 import { parseEncryptedSmartStoreExcel } from "../lib/shipping/parse-encrypted-smart-store-excel";
+import { parseMeatfriendsWorkbook } from "../lib/shipping/parse-meatfriends-excel";
+import { convertMeatfriendsRowToHanjinRow, joinAddressParts } from "../lib/shipping/convert-meatfriends-to-hanjin";
+import { isHtmlTableFile, normalizeHtmlCellText, parseHtmlTableRows, parseMeatfriendsFile } from "../lib/shipping/parse-meatfriends-file";
 import { DEFAULT_DELIVERY_MESSAGE } from "../lib/shipping/constants";
 import { normalizeDeliveryMessage } from "../lib/shipping/excel-utils";
 import { createInitialManualForm, createManualShippingRow, normalizePackageQuantity } from "../lib/shipping/manual-shipping";
@@ -116,6 +119,58 @@ assert.equal(roundTripData[1]?.[1], "01234");
 assert.equal(roundTripData[1]?.[4], "01012345678");
 assert.equal(roundTripData[1]?.[5], 1);
 
+assert.equal(joinAddressParts(" 경기도  광주시 ", " 101동\n202호 "), "경기도 광주시 101동 202호");
+assert.equal(joinAddressParts("경기도 광주시", ""), "경기도 광주시");
+assert.equal(joinAddressParts("", "101동 202호"), "101동 202호");
+assert.equal(joinAddressParts(null, undefined), "");
+
+const meatfriendsInput = XLSX.utils.book_new();
+XLSX.utils.book_append_sheet(meatfriendsInput, XLSX.utils.aoa_to_sheet([["안내"], [""]]), "guide");
+XLSX.utils.book_append_sheet(meatfriendsInput, XLSX.utils.aoa_to_sheet([
+  ["미트프렌즈 주문"],
+  [" 상품명\n", "상세주소", " 주소 ", "우편번호", "기본연락처", "수취인명", "추가열"],
+  ["갈비살 600g", "101동 202호", "경기도  광주시", "01234", "010-1234-5678", "홍길동", "무시"],
+  ["안심", "", "서울시", "04567", "01098765432", "김영희", ""],
+  ["", "", "", "", "", "", ""],
+]), "orders");
+assert.equal(detectMarketplace(meatfriendsInput), "meatfriends");
+const meatfriendsParsed = parseMeatfriendsWorkbook(meatfriendsInput);
+assert.equal(meatfriendsParsed.length, 2);
+assert.equal(meatfriendsParsed[0]?.sourceRowNumber, 3);
+const meatfriendsConverted = meatfriendsParsed.map(({ row }) => convertMeatfriendsRowToHanjinRow(row));
+assert.deepEqual(meatfriendsConverted[0], { receiverName: "홍길동", postalCode: "01234", address: "경기도 광주시 101동 202호", phone: "010-1234-5678", mobilePhone: "010-1234-5678", packageQuantity: 1, emptyColumn1: "", emptyColumn2: "", productName: "갈비살 600g", emptyColumn3: "", deliveryMessage: DEFAULT_DELIVERY_MESSAGE, shippingFareType: "" });
+assert.equal(meatfriendsConverted[1]?.address, "서울시");
+const meatfriendsArray = XLSX.write(meatfriendsInput, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+const sourcedMeatfriends = parseMarketplaceExcel(meatfriendsArray, "meatfriends", "meatfriends.xlsx");
+assert.equal(sourcedMeatfriends[0]?.source, "meatfriends");
+assert.equal(sourcedMeatfriends[0]?.rowKey, "meatfriends:meatfriends.xlsx:3");
+const missingMeatfriends = XLSX.utils.book_new();
+XLSX.utils.book_append_sheet(missingMeatfriends, XLSX.utils.aoa_to_sheet([["수취인명", "기본연락처", "우편번호", "주소"]]), "orders");
+assert.throws(() => parseMeatfriendsWorkbook(missingMeatfriends), /필수 컬럼이 없습니다: 상품명/);
+
+const htmlHeaders = [...Array.from({ length: 75 }, (_, index) => `추가열${index}`), "상품명", "수취인명", "기본연락처", "우편번호", "주소", "상세주소"];
+const htmlValues = [...Array.from({ length: 75 }, () => ""), "갈비살 &amp; 안심&nbsp; 4kg", "홍길동", "010-1234-5678", "01234", "경기도&nbsp; 광주시", "101동<br>202호"];
+const meatfriendsHtml = `\uFEFF<table border="1"><tr>${htmlHeaders.map((header) => `<td>${header}</td>`).join("")}</tr><tr>${htmlValues.map((value) => `<td>${value}</td>`).join("")}</tr><tr>${htmlHeaders.map(() => "<td>&nbsp;</td>").join("")}</tr></table>`;
+const htmlBytes = new TextEncoder().encode(meatfriendsHtml);
+const htmlBuffer = htmlBytes.buffer.slice(htmlBytes.byteOffset, htmlBytes.byteOffset + htmlBytes.byteLength) as ArrayBuffer;
+assert.equal(isHtmlTableFile(htmlBuffer), true);
+assert.equal(isHtmlTableFile(meatfriendsArray), false);
+assert.equal(normalizeHtmlCellText(" \u00a0 \n "), "");
+const htmlRows = parseHtmlTableRows(meatfriendsHtml);
+assert.equal(htmlRows[0]?.length, 81);
+assert.equal(htmlRows[1]?.[75], "갈비살 & 안심 4kg");
+const htmlConverted = parseMeatfriendsFile(htmlBuffer, "배송조회_20260728.xls");
+assert.equal(htmlConverted.length, 1);
+assert.equal(htmlConverted[0]?.rowKey, "meatfriends:배송조회_20260728.xls:2");
+assert.equal(htmlConverted[0]?.receiverName, "홍길동");
+assert.equal(htmlConverted[0]?.postalCode, "01234");
+assert.equal(htmlConverted[0]?.address, "경기도 광주시 101동 202호");
+assert.equal(htmlConverted[0]?.phone, "010-1234-5678");
+assert.equal(htmlConverted[0]?.mobilePhone, "010-1234-5678");
+assert.equal(htmlConverted[0]?.productName, "갈비살 & 안심 4kg");
+assert.equal(htmlConverted[0]?.packageQuantity, 1);
+assert.equal(htmlConverted[0]?.deliveryMessage, DEFAULT_DELIVERY_MESSAGE);
+
 const coupangInput = XLSX.utils.book_new();
 XLSX.utils.book_append_sheet(coupangInput, XLSX.utils.aoa_to_sheet([]), "빈 시트");
 XLSX.utils.book_append_sheet(coupangInput, XLSX.utils.aoa_to_sheet([
@@ -216,11 +271,11 @@ const wrongPasswordEncrypted = await wrongPasswordWorkbook.outputAsync({ type: "
 assert.ok(wrongPasswordEncrypted instanceof ArrayBuffer);
 await assert.rejects(() => parseEncryptedSmartStoreExcel(wrongPasswordEncrypted, "wrong.xlsx"), /비밀번호를 해제하지 못했습니다/);
 
-const allMarketplaces = [...sourcedMeatbox, ...sourcedCoupang, ...sourcedSmartStore];
-assert.equal(allMarketplaces.length, 9);
-assert.deepEqual(allMarketplaces.map((row) => row.source), ["meatbox", "meatbox", "meatbox", "coupang-wing", "coupang-wing", "smart-store", "smart-store", "smart-store", "smart-store"]);
+const allMarketplaces = [...sourcedMeatbox, ...sourcedCoupang, ...sourcedSmartStore, ...sourcedMeatfriends];
+assert.equal(allMarketplaces.length, 11);
+assert.deepEqual(allMarketplaces.map((row) => row.source), ["meatbox", "meatbox", "meatbox", "coupang-wing", "coupang-wing", "smart-store", "smart-store", "smart-store", "smart-store", "meatfriends", "meatfriends"]);
 const allData = XLSX.utils.sheet_to_json<Array<string | number>>(createHanjinWorkbook(allMarketplaces).Sheets["한진택배"]!, { header: 1, raw: true, defval: "" });
-assert.equal(allData.length - 1, 9);
+assert.equal(allData.length - 1, 11);
 assert.equal(allData[6]?.[0], "박하나");
 assert.equal(allData[6]?.[3], "010-1111-2222");
 assert.equal(allData[6]?.[3], allData[6]?.[4]);

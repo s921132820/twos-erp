@@ -1,4 +1,4 @@
-export type MarketplaceType = "meatbox" | "coupang-wing" | "smart-store";
+export type MarketplaceType = "meatbox" | "coupang-wing" | "smart-store" | "meatfriends";
 export type MarketplaceSource = MarketplaceType | "manual";
 
 export type ParsedOrderRow<T> = {
@@ -33,6 +33,15 @@ export type SmartStoreOrderRow = {
   buyerPhoneNumber: string;
   postalCode: string;
   deliveryMessage: string;
+};
+
+export type MeatfriendsOrderRow = {
+  recipientName: string;
+  basicContact: string;
+  postalCode: string;
+  address: string;
+  detailAddress: string;
+  productName: string;
 };
 
 export type HanjinShippingRow = {
