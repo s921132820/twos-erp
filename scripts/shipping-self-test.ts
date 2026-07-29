@@ -17,6 +17,7 @@ import { normalizeDeliveryMessage } from "../lib/shipping/excel-utils";
 import { createInitialManualForm, createManualShippingRow, normalizePackageQuantity } from "../lib/shipping/manual-shipping";
 import { groupShippingRowsByProduct, normalizeProductNameForGrouping } from "../lib/shipping/product-summary";
 import { commitProductSummaryName, createEditableProductSummaries, normalizeSummaryQuantity } from "../lib/shipping/editable-product-summary";
+import { createProductSummaryWorkbook, getProductSummaryFileName, prepareProductSummaryExportRows } from "../lib/shipping/export-product-summary";
 
 assert.equal(combineProductNameAndWeight("돈삼겹살", "10.35kg"), "돈삼겹살 / 10.35kg");
 assert.equal(combineProductNameAndWeight("돈삼겹살", ""), "돈삼겹살");
@@ -69,6 +70,15 @@ assert.equal(mergedGroups[0]?.productName, "LA갈비");
 assert.equal(mergedGroups[0]?.quantity, 5);
 assert.equal(normalizeSummaryQuantity("7", 3), 7);
 for (const invalid of ["", "-1", "1.5", "abc", "NaN"]) assert.equal(normalizeSummaryQuantity(invalid, 3), 3);
+const preparedSummaryExport = prepareProductSummaryExportRows([{ productName: " LA갈비 ", quantity: 2 }, { productName: "la갈비", quantity: 3 }, { productName: "안심", quantity: 0 }, { productName: " ", quantity: 9 }, { productName: "invalid", quantity: -1 }]);
+assert.deepEqual(preparedSummaryExport, [{ productName: "LA갈비", quantity: 5 }, { productName: "안심", quantity: 0 }]);
+const summaryWorkbook = createProductSummaryWorkbook(preparedSummaryExport);
+assert.deepEqual(summaryWorkbook.SheetNames, ["물품별 집계"]);
+const summaryData = XLSX.utils.sheet_to_json<Array<string | number>>(summaryWorkbook.Sheets["물품별 집계"]!, { header: 1, raw: true, defval: "" });
+assert.deepEqual(summaryData, [["번호", "물품명", "개수"], [1, "LA갈비", 5], [2, "안심", 0]]);
+assert.equal(typeof summaryData[1]?.[0], "number");
+assert.equal(typeof summaryData[1]?.[2], "number");
+assert.equal(getProductSummaryFileName(new Date(2026, 6, 29)), "물품별 집계_20260729.xlsx");
 
 const input = XLSX.utils.book_new();
 XLSX.utils.book_append_sheet(input, XLSX.utils.aoa_to_sheet([["안내"]]), "안내");
