@@ -16,6 +16,7 @@ import { DEFAULT_DELIVERY_MESSAGE } from "../lib/shipping/constants";
 import { normalizeDeliveryMessage } from "../lib/shipping/excel-utils";
 import { createInitialManualForm, createManualShippingRow, normalizePackageQuantity } from "../lib/shipping/manual-shipping";
 import { groupShippingRowsByProduct, normalizeProductNameForGrouping } from "../lib/shipping/product-summary";
+import { commitProductSummaryName, createEditableProductSummaries, normalizeSummaryQuantity } from "../lib/shipping/editable-product-summary";
 
 assert.equal(combineProductNameAndWeight("돈삼겹살", "10.35kg"), "돈삼겹살 / 10.35kg");
 assert.equal(combineProductNameAndWeight("돈삼겹살", ""), "돈삼겹살");
@@ -58,6 +59,16 @@ assert.equal(productGroups[0]?.productName, "LA갈비");
 assert.equal(productGroups[0]?.quantity, 4);
 assert.equal(productGroups[1]?.productName, "물품명 미입력");
 assert.equal(productGroups[1]?.quantity, 1);
+const editableGroups = createEditableProductSummaries([{ key: "la갈비", productName: "LA갈비", quantity: 3 }, { key: "안심", productName: "안심", quantity: 2 }]);
+assert.equal(editableGroups[0]?.id, "product-summary:la갈비");
+const renamedGroups = commitProductSummaryName(editableGroups.map((row) => row.id === "product-summary:la갈비" ? { ...row, productName: "  LA갈비   프리미엄 " } : row), "product-summary:la갈비");
+assert.equal(renamedGroups[0]?.productName, "LA갈비 프리미엄");
+const mergedGroups = commitProductSummaryName(editableGroups.map((row) => row.id === "product-summary:안심" ? { ...row, productName: " la갈비 " } : row), "product-summary:안심");
+assert.equal(mergedGroups.length, 1);
+assert.equal(mergedGroups[0]?.productName, "LA갈비");
+assert.equal(mergedGroups[0]?.quantity, 5);
+assert.equal(normalizeSummaryQuantity("7", 3), 7);
+for (const invalid of ["", "-1", "1.5", "abc", "NaN"]) assert.equal(normalizeSummaryQuantity(invalid, 3), 3);
 
 const input = XLSX.utils.book_new();
 XLSX.utils.book_append_sheet(input, XLSX.utils.aoa_to_sheet([["안내"]]), "안내");

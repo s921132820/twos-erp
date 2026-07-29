@@ -99,6 +99,14 @@ export type ProductQuantitySummary = {
   quantity: number;
 };
 
+export type EditableProductSummary = {
+  id: string;
+  originalProductKey: string;
+  productName: string;
+  lastValidProductName: string;
+  quantity: number;
+};
+
 export type MarketplaceUploadState = {
   file: File | null;
   fileName: string;

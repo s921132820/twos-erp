@@ -6,9 +6,9 @@ import type { ConvertedShippingRow, ProductQuantitySummary } from "@/lib/shippin
 import { ProductSummaryTable } from "./product-summary-table";
 import { ShippingPreviewTable } from "./shipping-preview-table";
 
-type Props = { finalRows: ConvertedShippingRow[]; allRows: ConvertedShippingRow[]; groupedProducts: ProductQuantitySummary[]; excludedRowKeys: Set<string>; onEdit: (row: ConvertedShippingRow) => void; onToggleExclude: (rowKey: string) => void; onDeleteManual: (row: ConvertedShippingRow) => void };
+type Props = { finalRows: ConvertedShippingRow[]; allRows: ConvertedShippingRow[]; groupedProducts: ProductQuantitySummary[]; productSummaryResetKey: string; excludedRowKeys: Set<string>; onEdit: (row: ConvertedShippingRow) => void; onToggleExclude: (rowKey: string) => void; onDeleteManual: (row: ConvertedShippingRow) => void };
 
-export function ShippingResultTabs({ finalRows, allRows, groupedProducts, excludedRowKeys, onEdit, onToggleExclude, onDeleteManual }: Props) {
+export function ShippingResultTabs({ finalRows, allRows, groupedProducts, productSummaryResetKey, excludedRowKeys, onEdit, onToggleExclude, onDeleteManual }: Props) {
   const [tab, setTab] = useState<"combined" | "products">("combined");
   const warningCount = finalRows.filter((row) => !row.validation.isValid).length;
   return <div className="space-y-4">
@@ -17,7 +17,7 @@ export function ShippingResultTabs({ finalRows, allRows, groupedProducts, exclud
       <Tab active={tab === "products"} onClick={() => setTab("products")} controls="products-panel">물품별 집계 <Count>{groupedProducts.length}</Count></Tab>
     </div>
     <div id="combined-panel" role="tabpanel" hidden={tab !== "combined"}>{warningCount > 0 && <div className="mb-4 flex gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-800"><AlertTriangle className="mt-0.5 shrink-0" size={17} /><span>확인이 필요한 주문이 {warningCount}건 있습니다. 미리보기에서 누락 정보를 확인하거나 수정해 주세요.</span></div>}<ShippingPreviewTable orders={allRows} excludedRowKeys={excludedRowKeys} onEdit={onEdit} onToggleExclude={onToggleExclude} onDeleteManual={onDeleteManual} /></div>
-    <div id="products-panel" role="tabpanel" hidden={tab !== "products"}><ProductSummaryTable groups={groupedProducts} /></div>
+    <div id="products-panel" role="tabpanel" hidden={tab !== "products"}><ProductSummaryTable key={productSummaryResetKey} groups={groupedProducts} /></div>
   </div>;
 }
 
