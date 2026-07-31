@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import * as XLSX from "xlsx";
 import XlsxPopulate from "xlsx-populate";
-import { combineProductNameAndWeight, convertMeatboxRowToHanjinRow, getMeatboxProductLabel, needsReview, normalizeProductNumber } from "../lib/shipping/convert-meatbox-to-hanjin";
+import { combineProductNameAndWeight, convertMeatboxRowToHanjinRow, formatMeatboxWeight, getMeatboxProductLabel, needsReview, normalizeProductNumber } from "../lib/shipping/convert-meatbox-to-hanjin";
 import { createHanjinWorkbook, HANJIN_HEADERS } from "../lib/shipping/export-hanjin-excel";
 import { convertCoupangWingRowToHanjinRow } from "../lib/shipping/convert-coupang-wing-to-hanjin";
 import { detectMarketplace } from "../lib/shipping/marketplace-detector";
@@ -19,9 +19,9 @@ import { groupShippingRowsByProduct, normalizeProductNameForGrouping } from "../
 import { commitProductSummaryName, createEditableProductSummaries, normalizeSummaryQuantity } from "../lib/shipping/editable-product-summary";
 import { createProductSummaryWorkbook, getProductSummaryFileName, prepareProductSummaryExportRows } from "../lib/shipping/export-product-summary";
 
-assert.equal(combineProductNameAndWeight("돈삼겹살", "10.35kg"), "돈삼겹살 / 10.35kg");
+assert.equal(combineProductNameAndWeight("돈삼겹살", "10.35kg"), "돈삼겹살 10.35kg");
 assert.equal(combineProductNameAndWeight("돈삼겹살", ""), "돈삼겹살");
-assert.equal(combineProductNameAndWeight("", "10.35"), "10.35");
+assert.equal(combineProductNameAndWeight("", "10.35"), "10.35kg");
 assert.equal(combineProductNameAndWeight(null, undefined), "");
 assert.equal(normalizeProductNumber(" 285058 "), "285058");
 assert.equal(getMeatboxProductLabel(285058), "(박피)");
@@ -29,10 +29,15 @@ assert.equal(getMeatboxProductLabel(" 285055 "), "(암)");
 assert.equal(getMeatboxProductLabel("217548"), "(수)");
 assert.equal(getMeatboxProductLabel("999999"), "");
 assert.equal(getMeatboxProductLabel(undefined), "");
-assert.equal(combineProductNameAndWeight("염소 앞다리", "12.30kg", 285058), "염소 앞다리 / (박피) 12.30kg");
-assert.equal(combineProductNameAndWeight("염소 앞다리", "12.30kg", "285055"), "염소 앞다리 / (암) 12.30kg");
-assert.equal(combineProductNameAndWeight("염소 앞다리", "12.30kg", " 217548 "), "염소 앞다리 / (수) 12.30kg");
-assert.equal(combineProductNameAndWeight("염소 앞다리", "12.30kg", 999999), "염소 앞다리 / 12.30kg");
+assert.equal(combineProductNameAndWeight("염소 앞다리", "12.30kg", 285058), "염소 앞다리 (박피) 12.30kg");
+assert.equal(combineProductNameAndWeight("염소 앞다리", "12.30kg", "285055"), "염소 앞다리 (암) 12.30kg");
+assert.equal(combineProductNameAndWeight("염소 앞다리", "12.30kg", " 217548 "), "염소 앞다리 (수) 12.30kg");
+assert.equal(combineProductNameAndWeight("염소 앞다리", "12.30kg", 999999), "염소 앞다리 12.30kg");
+assert.equal(formatMeatboxWeight(12.3), "12.3kg");
+assert.equal(formatMeatboxWeight("12.30"), "12.30kg");
+for (const weight of ["12.30kg", "12.30 kg", "12.30KG", "12.30 Kg"]) assert.equal(formatMeatboxWeight(weight), "12.30kg");
+for (const emptyWeight of ["", " ", null, undefined]) assert.equal(formatMeatboxWeight(emptyWeight), "");
+assert.equal(formatMeatboxWeight("약 12.3"), "약 12.3kg");
 for (const emptyMessage of [undefined, null, "", " ", "\n", "\r\n"]) assert.equal(normalizeDeliveryMessage(emptyMessage), DEFAULT_DELIVERY_MESSAGE);
 assert.equal(normalizeDeliveryMessage(" 문 앞에 놓아주세요 "), "문 앞에 놓아주세요");
 
@@ -95,7 +100,7 @@ assert.equal(parsed.length, 3);
 assert.equal(parsed[0]?.row.postalCode, "01234");
 assert.equal(parsed[0]?.sourceRowNumber, 3);
 const converted = parsed.map(({ row }) => convertMeatboxRowToHanjinRow(row));
-assert.equal(converted[0]?.productName, "[호주] 염소갈비 / 10.25kg");
+assert.equal(converted[0]?.productName, "[호주] 염소갈비 10.25kg");
 assert.equal(converted[0]?.phone, "01012345678");
 assert.equal(converted[0]?.phone, converted[0]?.mobilePhone);
 assert.equal(converted[0]?.mobilePhone, "01012345678");
@@ -117,7 +122,7 @@ XLSX.utils.book_append_sheet(labeledMeatboxWorkbook, XLSX.utils.aoa_to_sheet([
 ]), "orders");
 const labeledRows = parseMeatboxWorkbook(labeledMeatboxWorkbook).map(({ row }) => convertMeatboxRowToHanjinRow(row));
 assert.deepEqual(labeledRows.map((row) => row.productName), [
-  "염소 앞다리 / (박피) 12.30kg", "염소 앞다리 / (암) 12.30kg", "염소 앞다리 / (수) 12.30kg", "염소 앞다리 / 12.30kg",
+  "염소 앞다리 (박피) 12.30kg", "염소 앞다리 (암) 12.30kg", "염소 앞다리 (수) 12.30kg", "염소 앞다리 12.30kg",
 ]);
 
 const output = createHanjinWorkbook(converted);
@@ -130,7 +135,7 @@ assert.equal(data[1]?.[3], data[1]?.[4]);
 assert.equal(data[1]?.[5], 1);
 assert.equal(data[1]?.[6], "");
 assert.equal(data[1]?.[7], "");
-assert.equal(data[1]?.[8], "[호주] 염소갈비 / 10.25kg");
+assert.equal(data[1]?.[8], "[호주] 염소갈비 10.25kg");
 assert.equal(data[1]?.[9], "");
 assert.equal(data[1]?.[10], "문 앞");
 
