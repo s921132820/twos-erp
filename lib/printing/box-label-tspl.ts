@@ -29,6 +29,11 @@ export type TsplPrintSettings = { density: number; speed: number };
 
 const WIDTH = 480;
 const HEIGHT = 720;
+export const BARCODE_MIN_BARS_HEIGHT = 24;
+
+export function minimumBarcodeHeight() {
+  return BARCODE_MIN_BARS_HEIGHT;
+}
 
 function wrapLines(context: CanvasRenderingContext2D, text: string, maxWidth: number, maxLines: number) {
   const lines: string[] = [];
@@ -111,19 +116,30 @@ function drawBarcode(context: CanvasRenderingContext2D, value: string, layout: L
     context.restore();
     return;
   }
-  const barcodeCanvas = document.createElement("canvas");
-  JsBarcode(barcodeCanvas, value, {
-    format: "CODE128",
-    width: 2,
-    height: Math.max(24, layout.height - 24),
-    displayValue: true,
-    fontSize: layout.fontSize,
-    textMargin: 2,
-    margin: 0,
-    background: "#ffffff",
-    lineColor: "#000000",
-  });
-  context.drawImage(barcodeCanvas, layout.x, layout.y, layout.width, layout.height);
+  const makeBarcode = (moduleWidth: number) => {
+    const barcodeCanvas = document.createElement("canvas");
+    JsBarcode(barcodeCanvas, value, {
+      format: "CODE128",
+      width: moduleWidth,
+      height: Math.max(BARCODE_MIN_BARS_HEIGHT, Math.round(layout.height)),
+      displayValue: false,
+      margin: 0,
+      background: "#ffffff",
+      lineColor: "#000000",
+    });
+    return barcodeCanvas;
+  };
+  let barcodeCanvas = makeBarcode(2);
+  if (barcodeCanvas.width > layout.width) barcodeCanvas = makeBarcode(1);
+  const drawX = Math.round(layout.x + (layout.width - barcodeCanvas.width) / 2);
+  const drawY = Math.round(layout.y + (layout.height - barcodeCanvas.height) / 2);
+  context.save();
+  context.beginPath();
+  context.rect(layout.x, layout.y, layout.width, layout.height);
+  context.clip();
+  context.imageSmoothingEnabled = false;
+  context.drawImage(barcodeCanvas, drawX, drawY);
+  context.restore();
 }
 
 export async function renderBoxLabelCanvas(data: BoxLabelPrintData, printConfig: LabelPrintConfig, options?: { selectedField?: LabelFieldKey }) {
@@ -149,11 +165,13 @@ export async function renderBoxLabelCanvas(data: BoxLabelPrintData, printConfig:
   drawField(context, data.manufactureDate, config.fields.today);
   drawField(context, data.expirationDate, config.fields.expiryDate);
   drawField(context, data.reportNumber, config.fields.reportNumber, 900);
-  drawField(context, data.historyNumber, config.fields.importHistoryNumber);
-  drawBarcode(context, data.barcodeNumber, config.fields.barcodeNumber);
+  const barcodeValue = data.barcodeNumber || data.historyNumber;
+  drawBarcode(context, barcodeValue, config.fields.barcodeNumber);
+  drawField(context, barcodeValue, config.fields.importHistoryNumber);
   drawField(context, data.materialLabel, config.fields.materialLabel);
   drawField(context, data.material, config.fields.material, 400);
-  drawField(context, data.productSpec, config.fields.productSpec);
+  const productSpecText = `■제품규격:${data.productSpec.trim() ? ` ${data.productSpec.trim()}` : ""}`;
+  drawField(context, productSpecText, config.fields.productSpec);
   drawField(context, data.storageMethod, config.fields.storageMethod);
   drawField(context, data.foodType, config.fields.foodType);
   drawField(context, data.packagingMaterial, config.fields.packagingMaterial);

@@ -5,8 +5,8 @@ import { AlertTriangle, PackageSearch, Printer, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { createBoxLabelTspl, renderBoxLabelCanvas, type BoxLabelPrintData } from "@/lib/printing/box-label-tspl";
-import { cloneLabelPrintConfig, dotsToMm, LABEL_PRINT_CONFIGS, normalizeLabelPrintConfig, type LabelFieldKey, type LabelPrintConfig } from "@/lib/printing/label-print-config";
+import { BARCODE_MIN_BARS_HEIGHT, createBoxLabelTspl, minimumBarcodeHeight, renderBoxLabelCanvas, type BoxLabelPrintData } from "@/lib/printing/box-label-tspl";
+import { cloneLabelPrintConfig, dotsToMm, LABEL_PRINT_CONFIGS, mmToDots, normalizeLabelPrintConfig, type LabelFieldKey, type LabelPrintConfig } from "@/lib/printing/label-print-config";
 import { listQzPrinters, printTspl } from "@/lib/printing/qz-client";
 import { cn } from "@/lib/utils";
 
@@ -38,7 +38,7 @@ const FIELD_LABELS: Record<LabelFieldKey, string> = {
   weightUnit: "중량 단위",
   productSpec: "제품규격",
   reportNumber: "품목보고번호",
-  importHistoryNumber: "수입이력번호/바코드",
+  importHistoryNumber: "수입이력번호",
   origin: "원산지",
   today: "오늘 날짜",
   expiryDate: "유통기한",
@@ -101,7 +101,7 @@ function defaultLabelData(today: string, product?: LabelProduct): BoxLabelPrintD
     frozenText: "냉동",
     weight: "20",
     weightUnit: "kg",
-    productSpec: "■ 제품규격: 20 kg",
+    productSpec: "",
     reportNumber: product?.code ?? "",
     historyNumber: history?.historyNumber ?? "",
     barcodeNumber: history?.historyNumber ?? "",
@@ -109,9 +109,9 @@ function defaultLabelData(today: string, product?: LabelProduct): BoxLabelPrintD
     manufactureDate: shortDate(today),
     expirationDate: expirationDate ? `${shortDate(expirationDate)}까지` : "",
     material: product?.material ?? "",
-    materialLabel: "■ 원료 및 함량:",
-    storageMethod: "냉동보관",
-    foodType: "돼지고기 함유",
+    materialLabel: "■원료및함량:",
+    storageMethod: "",
+    foodType: "",
     packagingMaterial: "- HDPE\n- 골판지 / 진공포장",
     notice: "■ 본 제품은 등록된 제조시설에서 제조하고 있습니다.",
     manufacturer: "제조원: (주)투에스푸드",
@@ -140,11 +140,16 @@ function bitmapHexDump(bitmap: Uint8Array, widthBytes: number) {
 
 function CanvasPreview({ data, layout, selectedField, onSelectField }: { data: BoxLabelPrintData; layout: LabelPrintConfig; selectedField: LabelFieldKey; onSelectField: (key: LabelFieldKey) => void }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const printRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     let cancelled = false;
-    void renderBoxLabelCanvas(data, layout, { selectedField }).then(({ canvas }) => {
-      if (cancelled || !ref.current) return;
-      ref.current.getContext("2d")?.drawImage(canvas, 0, 0);
+    void Promise.all([
+      renderBoxLabelCanvas(data, layout, { selectedField }),
+      renderBoxLabelCanvas(data, layout),
+    ]).then(([preview, printable]) => {
+      if (cancelled) return;
+      ref.current?.getContext("2d")?.drawImage(preview.canvas, 0, 0);
+      printRef.current?.getContext("2d")?.drawImage(printable.canvas, 0, 0);
     });
     return () => { cancelled = true; };
   }, [data, layout, selectedField]);
@@ -161,7 +166,10 @@ function CanvasPreview({ data, layout, selectedField, onSelectField }: { data: B
     });
     if (hit) onSelectField(hit);
   };
-  return <canvas ref={ref} width={480} height={720} onClick={selectAtPoint} className="box-label-canvas cursor-crosshair" aria-label="박스라벨 20kg 실시간 미리보기" />;
+  return <>
+    <canvas ref={ref} width={480} height={720} onClick={selectAtPoint} className="box-label-canvas box-label-screen-canvas cursor-crosshair" aria-label="박스라벨 20kg 실시간 미리보기" />
+    <canvas ref={printRef} width={480} height={720} className="box-label-canvas box-label-print-canvas" aria-label="박스라벨 20kg 인쇄본" />
+  </>;
 }
 
 export function LabelPrinterWorkspace() {
@@ -192,28 +200,47 @@ export function LabelPrinterWorkspace() {
   const visibleFieldKeys = FIELD_KEYS.filter((key) => FIELD_LABELS[key].toLocaleLowerCase().includes(fieldSearch.trim().toLocaleLowerCase()));
 
   useEffect(() => {
-    const saved = window.localStorage.getItem("twosfood.box20kgLayout");
+    const saved = window.localStorage.getItem("twosfood.box20kgLayout.v7");
     if (!saved) return;
     try {
       const savedLayout = normalizeLabelPrintConfig(JSON.parse(saved) as LabelPrintConfig);
       initialLayoutRef.current = cloneLabelPrintConfig(savedLayout);
       queueMicrotask(() => setPrintConfig(cloneLabelPrintConfig(savedLayout)));
     } catch {
-      window.localStorage.removeItem("twosfood.box20kgLayout");
+      window.localStorage.removeItem("twosfood.box20kgLayout.v7");
       toast.error("저장된 라벨 배치가 손상되어 코드 기본값으로 시작했습니다.");
     }
   }, []);
+  const labelWidthDots = mmToDots(printConfig.widthMm, printConfig.dpi);
+  const labelHeightDots = mmToDots(printConfig.heightMm, printConfig.dpi);
   const layoutErrors = FIELD_KEYS.flatMap((key) => {
     const field = printConfig.fields[key];
+    if (!field.visible) return [];
     const manufacturerField = key === "manufacturer" || key === "manufacturerAddress" || key === "manufacturerPhone";
     const x = field.x + (manufacturerField ? printConfig.manufacturerGroupOffsetX : printConfig.contentOffsetX);
     const y = field.y + (manufacturerField ? printConfig.manufacturerGroupOffsetY : printConfig.contentOffsetY);
     const messages: string[] = [];
-    if (x < 0 || y < 0 || x + field.width > 480 || y + field.height > 720) messages.push(`${FIELD_LABELS[key]} 영역이 라벨 경계를 벗어났습니다.`);
-    if (field.height < field.fontSize + field.paddingY * 2) messages.push(`${FIELD_LABELS[key]} 높이가 글자와 세로 여백보다 작습니다.`);
+    if (x < 0 || y < 0 || x + field.width > labelWidthDots || y + field.height > labelHeightDots) {
+      messages.push(`${FIELD_LABELS[key]} 영역이 ${printConfig.widthMm}×${printConfig.heightMm}mm 라벨 경계를 벗어났습니다.`);
+    }
+    if (key === "barcodeNumber") {
+      const requiredHeight = minimumBarcodeHeight();
+      if (field.height < requiredHeight) {
+        messages.push(`${FIELD_LABELS[key]} 막대 높이는 최소 ${BARCODE_MIN_BARS_HEIGHT}dot여야 합니다.`);
+      }
+    } else {
+      // Canvas lineHeight controls baseline spacing, but only the font glyph is
+      // clipped. Requiring a full line box rejects valid single-line fields.
+      const minimumTextHeight = field.fontSize + field.paddingY * 2;
+      if (field.height < minimumTextHeight) {
+        messages.push(`${FIELD_LABELS[key]} 높이는 글자와 상하 여백을 포함해 최소 ${minimumTextHeight}dot여야 합니다.`);
+      }
+    }
     const value = labelData[FIELD_DATA_KEYS[key]];
-    const estimatedCapacity = Math.max(1, Math.floor((field.width - field.paddingX * 2) / Math.max(4, field.fontSize * 0.65))) * Math.max(1, field.maxLines ?? 1);
-    if (!field.autoFit && value.length > estimatedCapacity) messages.push(`${FIELD_LABELS[key]} 내용이 설정 영역을 초과할 수 있습니다. 자동 축소를 켜거나 영역을 넓혀 주세요.`);
+    if (key !== "barcodeNumber") {
+      const estimatedCapacity = Math.max(1, Math.floor((field.width - field.paddingX * 2) / Math.max(4, field.fontSize * 0.65))) * Math.max(1, field.maxLines ?? 1);
+      if (!field.autoFit && value.length > estimatedCapacity) messages.push(`${FIELD_LABELS[key]} 내용이 설정 영역을 초과할 수 있습니다. 자동 축소를 켜거나 영역을 넓혀 주세요.`);
+    }
     return messages;
   });
 
@@ -243,13 +270,13 @@ export function LabelPrinterWorkspace() {
   const saveLayout = () => {
     if (layoutErrors.length) return toast.error(layoutErrors[0]);
     const normalized = normalizeLabelPrintConfig(printConfig);
-    window.localStorage.setItem("twosfood.box20kgLayout", JSON.stringify(normalized));
+    window.localStorage.setItem("twosfood.box20kgLayout.v7", JSON.stringify(normalized));
     initialLayoutRef.current = cloneLabelPrintConfig(normalized);
     toast.success("현재 배치를 이 PC의 시작 기본값으로 저장했습니다.");
   };
   const loadLayout = () => {
     try {
-      const saved = window.localStorage.getItem("twosfood.box20kgLayout");
+      const saved = window.localStorage.getItem("twosfood.box20kgLayout.v7");
       if (!saved) return toast.info("저장된 박스라벨 배치가 없습니다.");
       const savedLayout = normalizeLabelPrintConfig(JSON.parse(saved) as LabelPrintConfig);
       initialLayoutRef.current = cloneLabelPrintConfig(savedLayout);
@@ -290,6 +317,32 @@ export function LabelPrinterWorkspace() {
     const jobId = globalThis.crypto?.randomUUID?.() ?? String(Date.now());
     try {
       if (!printerName.trim()) throw new Error("출력할 프린터 이름을 입력해 주세요.");
+      const productNameLayout = printConfig.fields.productName;
+      const productNameAvailableHeight = productNameLayout.height - productNameLayout.paddingY * 2;
+      const productNameLineHeight = Math.max(productNameLayout.fontSize, productNameLayout.lineHeight);
+      console.debug("[label-printer] 제품명 세로 배치", {
+        dpi: printConfig.dpi,
+        label: {
+          widthMm: printConfig.widthMm,
+          heightMm: printConfig.heightMm,
+          widthDots: labelWidthDots,
+          heightDots: labelHeightDots,
+        },
+        productName: {
+          y: productNameLayout.y + printConfig.contentOffsetY,
+          bottom: productNameLayout.y + printConfig.contentOffsetY + productNameLayout.height,
+          height: productNameLayout.height,
+          fontSize: productNameLayout.fontSize,
+          lineHeight: productNameLayout.lineHeight,
+          effectiveLineHeight: productNameLineHeight,
+          paddingY: productNameLayout.paddingY,
+          availableHeight: productNameAvailableHeight,
+          minimumGlyphHeight: productNameLayout.fontSize,
+          minimumFieldHeight: productNameLayout.fontSize + productNameLayout.paddingY * 2,
+          fittingLineBoxes: Math.floor(productNameAvailableHeight / productNameLineHeight),
+        },
+        layoutErrors,
+      });
       if (layoutErrors.length) throw new Error(layoutErrors[0]);
       window.localStorage.setItem("twosfood.labelPrinterName", printerName.trim());
       const artifacts = await createBoxLabelTspl(labelData, { density, speed }, printConfig);
@@ -404,7 +457,7 @@ export function LabelPrinterWorkspace() {
             </div>
             <p className="mt-2 text-xs text-slate-500">QZ Tray가 이 PC에서 실행 중이어야 하며 Windows에 등록된 프린터 이름과 정확히 일치해야 합니다. <a href="https://qz.io/download/" target="_blank" rel="noreferrer" className="font-semibold text-blue-600 underline">QZ Tray 설치</a></p>
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="font-bold text-slate-900">박스라벨(20kg)</h3><p className="mt-1 text-sm text-slate-500">미리보기 데이터로 TSPL 60×90mm 라벨 1장을 직접 전송합니다.</p></div><div className="flex gap-2"><Button type="button" variant="outline" onClick={saveDebugArtifacts} disabled={!selected || savingDebug}>{savingDebug ? "진단 저장 중..." : "디버그 저장"}</Button><Button type="button" onClick={printOneLabel} disabled={!selected || printing}><Printer size={17} />{printing ? "TSPL 전송 중..." : "직접 인쇄"}</Button></div></div>
+          <div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="font-bold text-slate-900">박스라벨(20kg)</h3><p className="mt-1 text-sm text-slate-500">미리보기 데이터로 TSPL 60×90mm 라벨 1장을 직접 전송합니다.</p></div><div className="flex gap-2"><Button type="button" variant="outline" onClick={() => window.print()} disabled={!selected}>브라우저 인쇄</Button><Button type="button" variant="outline" onClick={saveDebugArtifacts} disabled={!selected || savingDebug}>{savingDebug ? "진단 저장 중..." : "디버그 저장"}</Button><Button type="button" onClick={printOneLabel} disabled={!selected || printing}><Printer size={17} />{printing ? "TSPL 전송 중..." : "직접 인쇄"}</Button></div></div>
           {!selected ? <div className="mt-5 rounded-lg border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">제품을 검색한 후 선택해 주세요.</div> : <div className="mt-5 grid gap-3 text-sm sm:grid-cols-2">
             <label className="text-xs font-semibold text-slate-600">제품명<Input value={labelData.productName} onChange={(event) => setLabelData((current) => ({ ...current, productName: event.target.value }))} className="mt-1" /></label>
             <label className="text-xs font-semibold text-slate-600">냉동 문구<Input value={labelData.frozenText} onChange={(event) => setLabelData((current) => ({ ...current, frozenText: event.target.value }))} className="mt-1" /></label>
@@ -412,15 +465,12 @@ export function LabelPrinterWorkspace() {
             <label className="text-xs font-semibold text-slate-600">중량 단위<Input value={labelData.weightUnit} onChange={(event) => setLabelData((current) => ({ ...current, weightUnit: event.target.value }))} className="mt-1" /></label>
             <label className="text-xs font-semibold text-slate-600 sm:col-span-2">제품규격<Input value={labelData.productSpec} onChange={(event) => setLabelData((current) => ({ ...current, productSpec: event.target.value }))} className="mt-1" /></label>
             <label className="text-xs font-semibold text-slate-600">품목보고번호<Input value={labelData.reportNumber} onChange={(event) => setLabelData((current) => ({ ...current, reportNumber: event.target.value }))} className="mt-1" /></label>
-            <label className="text-xs font-semibold text-slate-600">수입이력번호<Input value={labelData.historyNumber} onChange={(event) => setLabelData((current) => ({ ...current, historyNumber: event.target.value }))} className="mt-1" /></label>
-            <label className="text-xs font-semibold text-slate-600">바코드 번호<Input value={labelData.barcodeNumber} onChange={(event) => setLabelData((current) => ({ ...current, barcodeNumber: event.target.value }))} className="mt-1" /></label>
+            <label className="text-xs font-semibold text-slate-600">수입이력번호/바코드<Input value={labelData.barcodeNumber} onChange={(event) => setLabelData((current) => ({ ...current, historyNumber: event.target.value, barcodeNumber: event.target.value }))} className="mt-1" /></label>
             <label className="text-xs font-semibold text-slate-600">원산지<Input value={labelData.countryOfOrigin} onChange={(event) => setLabelData((current) => ({ ...current, countryOfOrigin: event.target.value }))} className="mt-1" /></label>
             <label className="text-xs font-semibold text-slate-600">오늘 날짜<Input value={labelData.manufactureDate} onChange={(event) => setLabelData((current) => ({ ...current, manufactureDate: event.target.value }))} className="mt-1" /></label>
             <label className="text-xs font-semibold text-slate-600">유통기한<Input value={labelData.expirationDate} onChange={(event) => setLabelData((current) => ({ ...current, expirationDate: event.target.value }))} className="mt-1" /></label>
             <label className="text-xs font-semibold text-slate-600 sm:col-span-2">원료 및 함량<textarea value={labelData.material} onChange={(event) => setLabelData((current) => ({ ...current, material: event.target.value }))} rows={4} className="mt-1 w-full rounded-md border border-slate-300 p-3" /></label>
             <label className="text-xs font-semibold text-slate-600 sm:col-span-2">원료 및 함량 제목<Input value={labelData.materialLabel} onChange={(event) => setLabelData((current) => ({ ...current, materialLabel: event.target.value }))} className="mt-1" /></label>
-            <label className="text-xs font-semibold text-slate-600 sm:col-span-2">보관방법<textarea value={labelData.storageMethod} onChange={(event) => setLabelData((current) => ({ ...current, storageMethod: event.target.value }))} rows={2} className="mt-1 w-full rounded-md border border-slate-300 p-3" /></label>
-            <label className="text-xs font-semibold text-slate-600 sm:col-span-2">식품의 유형<Input value={labelData.foodType} onChange={(event) => setLabelData((current) => ({ ...current, foodType: event.target.value }))} className="mt-1" /></label>
             <label className="text-xs font-semibold text-slate-600 sm:col-span-2">포장재질<textarea value={labelData.packagingMaterial} onChange={(event) => setLabelData((current) => ({ ...current, packagingMaterial: event.target.value }))} rows={2} className="mt-1 w-full rounded-md border border-slate-300 p-3" /></label>
             <label className="text-xs font-semibold text-slate-600 sm:col-span-2">주의사항<textarea value={labelData.notice} onChange={(event) => setLabelData((current) => ({ ...current, notice: event.target.value }))} rows={2} className="mt-1 w-full rounded-md border border-slate-300 p-3" /></label>
             <label className="text-xs font-semibold text-slate-600 sm:col-span-2">제조원<Input value={labelData.manufacturer} onChange={(event) => setLabelData((current) => ({ ...current, manufacturer: event.target.value }))} className="mt-1" /></label>
