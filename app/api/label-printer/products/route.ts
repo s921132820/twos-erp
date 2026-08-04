@@ -36,18 +36,12 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     success: true,
-    data: products.map(({ importLivestockHistories, ...product }) => {
-      const activeHistory = importLivestockHistories[0] ?? null;
-      return {
-        ...product,
-        activeHistory: activeHistory
-          ? {
-              ...activeHistory,
-              foreignSlaughterDate: dateOnly(activeHistory.foreignSlaughterDate),
-            }
-          : null,
-        activeHistoryCount: importLivestockHistories.length,
-      };
-    }),
+    data: products.map(({ importLivestockHistories, ...product }) => ({
+      ...product,
+      activeHistories: importLivestockHistories.map((history) => ({
+        ...history,
+        foreignSlaughterDate: dateOnly(history.foreignSlaughterDate),
+      })),
+    })),
   });
 }

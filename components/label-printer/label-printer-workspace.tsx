@@ -10,19 +10,22 @@ import { cloneLabelPrintConfig, dotsToMm, LABEL_PRINT_CONFIGS, mmToDots, normali
 import { listQzPrinters, printTspl } from "@/lib/printing/qz-client";
 import { cn } from "@/lib/utils";
 
+type ActiveHistory = {
+  id: number;
+  historyNumber: string | null;
+  countryOfOrigin: string | null;
+  foreignSlaughterDate: string | null;
+};
+
 type LabelProduct = {
   id: string;
   name: string;
   code: string;
   material: string | null;
-  activeHistoryCount: number;
-  activeHistory: null | {
-    id: number;
-    historyNumber: string;
-    countryOfOrigin: string;
-    foreignSlaughterDate: string | null;
-  };
+  activeHistories: ActiveHistory[];
 };
+
+type LabelSelection = { product: LabelProduct; history: ActiveHistory };
 
 type Tab = "box" | "vacuum" | "meatbox";
 const tabs: Array<{ id: Tab; label: string }> = [
@@ -93,8 +96,7 @@ function shortDate(value: string) {
   return value ? value.slice(2).replaceAll("-", ".") : "";
 }
 
-function defaultLabelData(today: string, product?: LabelProduct): BoxLabelPrintData {
-  const history = product?.activeHistory;
+function defaultLabelData(today: string, product?: LabelProduct, history?: ActiveHistory): BoxLabelPrintData {
   const expirationDate = addMonths(history?.foreignSlaughterDate ?? null, 24);
   return {
     productName: product?.name ?? "",
@@ -176,7 +178,7 @@ export function LabelPrinterWorkspace() {
   const [tab, setTab] = useState<Tab>("box");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<LabelProduct[]>([]);
-  const [selected, setSelected] = useState<LabelProduct | null>(null);
+  const [selected, setSelected] = useState<LabelSelection | null>(null);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState("");
@@ -244,9 +246,9 @@ export function LabelPrinterWorkspace() {
     return messages;
   });
 
-  const selectProduct = (product: LabelProduct) => {
-    const values = defaultLabelData(today, product);
-    setSelected(product);
+  const selectHistory = (product: LabelProduct, history: ActiveHistory) => {
+    const values = defaultLabelData(today, product, history);
+    setSelected({ product, history });
     setSourceLabelData(values);
     setLabelData(values);
   };
@@ -346,8 +348,8 @@ export function LabelPrinterWorkspace() {
       if (layoutErrors.length) throw new Error(layoutErrors[0]);
       window.localStorage.setItem("twosfood.labelPrinterName", printerName.trim());
       const artifacts = await createBoxLabelTspl(labelData, { density, speed }, printConfig);
-      console.info("[label-printer] TSPL 단일 전송", { jobId, sends: 1, copies: 1, printerName, density, speed, bytes: artifacts.command.byteLength, productId: selected.id, ...artifacts.debug, firstBitmapBytes: Array.from(artifacts.bitmap.slice(0, 16), (value) => value.toString(16).padStart(2, "0")).join(" ") });
-      await printTspl(printerName.trim(), artifacts.command, `박스라벨-${selected.id}-${jobId}`);
+      console.info("[label-printer] TSPL 단일 전송", { jobId, sends: 1, copies: 1, printerName, density, speed, bytes: artifacts.command.byteLength, productId: selected.product.id, historyId: selected.history.id, ...artifacts.debug, firstBitmapBytes: Array.from(artifacts.bitmap.slice(0, 16), (value) => value.toString(16).padStart(2, "0")).join(" ") });
+      await printTspl(printerName.trim(), artifacts.command, `박스라벨-${selected.product.id}-${selected.history.id}-${jobId}`);
       toast.success("TSC MB240 인쇄 대기열에 라벨 1장을 전송했습니다.");
     } catch (cause) {
       console.error("[label-printer] TSPL 출력 실패", cause);
@@ -364,7 +366,7 @@ export function LabelPrinterWorkspace() {
     try {
       const artifacts = await createBoxLabelTspl(labelData, { density, speed }, printConfig);
       const png = await new Promise<Blob>((resolve, reject) => artifacts.canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("PNG 생성에 실패했습니다.")), "image/png"));
-      const prefix = `box-label-${selected.id}`;
+      const prefix = `box-label-${selected.product.id}-${selected.history.id}`;
       downloadFile(`${prefix}-canvas.png`, png);
       downloadFile(`${prefix}-bitmap.hex.txt`, new Blob([bitmapHexDump(artifacts.bitmap, artifacts.debug.widthBytes)], { type: "text/plain;charset=utf-8" }));
       downloadFile(`${prefix}.tspl`, new Blob([artifacts.command], { type: "application/octet-stream" }));
@@ -403,11 +405,11 @@ export function LabelPrinterWorkspace() {
   };
 
   const missing = selected ? [
-    !selected.code && "품목보고번호",
-    !selected.activeHistory?.historyNumber && "현재 사용 중인 수입이력번호",
-    !selected.activeHistory?.countryOfOrigin && "원산지",
-    !selected.activeHistory?.foreignSlaughterDate && "도축일",
-    !selected.material && "원료 및 함량",
+    !selected.product.code && "품목보고번호",
+    !selected.history.historyNumber && "현재 사용 중인 수입이력번호",
+    !selected.history.countryOfOrigin && "원산지",
+    !selected.history.foreignSlaughterDate && "도축일",
+    !selected.product.material && "원료 및 함량",
   ].filter(Boolean) as string[] : [];
 
   return (
@@ -423,11 +425,14 @@ export function LabelPrinterWorkspace() {
         {error && <p role="alert" className="mt-3 text-sm text-red-600">{error}</p>}
         {searched && !loading && !error && results.length === 0 && <p className="mt-4 rounded-lg bg-slate-50 p-4 text-sm text-slate-500">검색 결과가 없습니다.</p>}
         {results.length > 0 && <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{results.map((product) => (
-          <button key={product.id} type="button" onClick={() => selectProduct(product)} className={cn("rounded-lg border p-4 text-left transition-colors", selected?.id === product.id ? "border-blue-500 bg-blue-50 ring-2 ring-blue-100" : "border-slate-200 hover:border-blue-300 hover:bg-slate-50")}>
+          <div key={product.id} className="rounded-lg border border-slate-200 p-4">
             <strong className="block text-sm text-slate-900">{product.name}</strong>
             <span className="mt-1 block text-xs text-slate-500">품목보고번호 {product.code || "없음"}</span>
-            <span className={cn("mt-2 inline-block rounded-full px-2 py-1 text-xs font-semibold", product.activeHistory ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700")}>{product.activeHistory ? `사용 이력 ${product.activeHistory.historyNumber}` : "사용 중인 이력 없음"}</span>
-          </button>
+            {product.activeHistories.length ? <div className="mt-3 flex flex-col gap-2">{product.activeHistories.map((history) => {
+              const isSelected = selected?.product.id === product.id && selected.history.id === history.id;
+              return <button key={`${product.id}:${history.id}`} type="button" onClick={() => selectHistory(product, history)} className={cn("rounded-md border px-3 py-2 text-left text-xs font-semibold transition-colors", isSelected ? "border-blue-500 bg-blue-50 text-blue-800 ring-2 ring-blue-100" : "border-emerald-200 bg-emerald-50 text-emerald-800 hover:border-blue-300")}>사용 이력 {history.historyNumber || "번호 없음"}</button>;
+            })}</div> : <span className="mt-2 inline-block rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">사용 중인 이력 없음</span>}
+          </div>
         ))}</div>}
       </div>
 
@@ -479,7 +484,7 @@ export function LabelPrinterWorkspace() {
             <div className="flex flex-wrap gap-2 sm:col-span-2"><Button type="button" variant="outline" onClick={resetSelectedValue}>선택 필드 원본값 복원</Button><Button type="button" variant="outline" onClick={() => setLabelData(sourceLabelData)}>전체 내용 초기화</Button></div>
             <p className="text-xs text-slate-500 sm:col-span-2">여기서 수정한 값은 현재 인쇄 세션에만 적용되며 제품 DB에는 저장되지 않습니다.</p>
           </div>}
-          {selected && selected.activeHistoryCount > 1 && <p className="mt-4 rounded-lg bg-blue-50 p-3 text-sm text-blue-800">활성 이력이 {selected.activeHistoryCount}개여서 가장 최근 수정된 이력을 사용합니다.</p>}
+          {selected && selected.product.activeHistories.length > 1 && <p className="mt-4 rounded-lg bg-blue-50 p-3 text-sm text-blue-800">활성 이력 {selected.product.activeHistories.length}개 중 {selected.history.historyNumber || "번호 없는 이력"}을 선택했습니다.</p>}
           {missing.length > 0 && <div className="mt-4 flex gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-800"><AlertTriangle className="mt-0.5 shrink-0" size={17} /><span>다음 정보가 없어 빈 값으로 표시됩니다: {missing.join(", ")}</span></div>}
         </div>
         <div className="label-preview-shell"><CanvasPreview data={labelData} layout={printConfig} selectedField={selectedField} onSelectField={setSelectedField} /></div>
