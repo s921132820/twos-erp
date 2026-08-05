@@ -17,7 +17,7 @@ export function ProductForm({ product, onSuccess, onCancel }: { product?: Produc
   const { register, handleSubmit, formState: { errors: clientErrors } } = useForm<ProductInput>({
     resolver: zodResolver(productSchema),
     defaultValues: {
-      code: product?.code ?? "", unit: product?.unit ?? "",
+      code: product?.code ?? "", unit: product?.unit ?? "", kind: product?.kind ?? "",
       description: product?.description ?? "", name: product?.name ?? "", category: product?.category ?? "",
       material: product?.material ?? "",
     },
@@ -40,6 +40,7 @@ export function ProductForm({ product, onSuccess, onCancel }: { product?: Produc
         <label className="text-sm font-medium text-slate-700">제품명 <span className="text-red-500">*</span><Input {...register("name")} className="mt-1.5" maxLength={100} /><FieldError messages={state.errors?.name ?? (clientErrors.name?.message ? [clientErrors.name.message] : undefined)} /></label>
         <label className="text-sm font-medium text-slate-700">카테고리 <span className="text-red-500">*</span><Input {...register("category")} className="mt-1.5" maxLength={50} /><FieldError messages={state.errors?.category ?? (clientErrors.category?.message ? [clientErrors.category.message] : undefined)} /></label>
         <label className="text-sm font-medium text-slate-700">제품유형 <span className="text-red-500">*</span><Input {...register("unit")} className="mt-1.5" maxLength={50} /><FieldError messages={state.errors?.unit ?? (clientErrors.unit?.message ? [clientErrors.unit.message] : undefined)} /></label>
+        <label className="text-sm font-medium text-slate-700">종류 <span className="text-red-500">*</span><Input {...register("kind")} className="mt-1.5" maxLength={50} /><FieldError messages={state.errors?.kind ?? (clientErrors.kind?.message ? [clientErrors.kind.message] : undefined)} /></label>
         <label className="text-sm font-medium text-slate-700">소비기한 <span className="text-red-500">*</span><Input {...register("description")} className="mt-1.5" maxLength={100} /><FieldError messages={state.errors?.description ?? (clientErrors.description?.message ? [clientErrors.description.message] : undefined)} /></label>
       </div>
       <label className="block text-sm font-medium text-slate-700">원료 및 함량<textarea {...register("material")} rows={5} maxLength={5000} placeholder="원료명과 함량을 입력해 주세요. 여러 줄로 입력할 수 있습니다." className="mt-1.5 w-full resize-y rounded-md border border-slate-300 bg-white p-3 text-sm outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100" /><FieldError messages={state.errors?.material ?? (clientErrors.material?.message ? [clientErrors.material.message] : undefined)} /></label>

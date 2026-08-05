@@ -9,6 +9,7 @@ const optional = (label: string, max: number) =>
 export const productSchema = z.object({
   code: required("품목보고번호", 20),
   unit: required("제품유형", 50),
+  kind: required("종류", 50),
   description: required("소비기한", 100),
   name: required("제품명", 100),
   category: required("카테고리", 50),

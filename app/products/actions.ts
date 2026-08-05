@@ -10,6 +10,7 @@ function formValue(formData: FormData) {
   return {
     code: formData.get("code"),
     unit: formData.get("unit"),
+    kind: formData.get("kind"),
     description: formData.get("description"),
     name: formData.get("name"),
     category: formData.get("category"),

@@ -24,6 +24,7 @@ export async function createProductRecord(input: ProductInput) {
         id: `p_${String(nextId).padStart(4, "0")}`,
         code: input.code,
         unit: input.unit,
+        kind: input.kind,
         description: input.description,
         name: input.name,
         category: input.category,
