@@ -28,6 +28,11 @@ const optionalDate = z.preprocess(
   z.coerce.date({ error: "올바른 날짜를 입력해 주세요." }).optional(),
 );
 
+const expirationDate = z.preprocess(
+  (value) => typeof value === "string" && !value.trim() ? undefined : value,
+  z.coerce.date({ error: "올바른 유통기한을 입력해 주세요." }).optional(),
+);
+
 export const importLivestockHistorySchema = z.object({
   productId: required("제품", 10),
   historyNumber: optional("수입축산물 이력번호", 50),
@@ -41,6 +46,7 @@ export const importLivestockHistorySchema = z.object({
   foreignProcessingPlant: optional("수출국 가공장", 500),
   partNameCode: optional("부위명(코드)", 200),
   foreignSlaughterDate: optionalStartDate,
+  expirationDate,
   memo: z.string().trim().max(2000, "메모는 2,000자 이하여야 합니다.").optional(),
   isActive: z.boolean(),
 });

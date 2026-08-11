@@ -4,7 +4,6 @@ import { Prisma } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { isGoatProduct } from "@/lib/products/is-goat-product";
 import { importLivestockHistorySchema, type ImportHistoryFormState } from "@/lib/validations/import-livestock-history";
 
 function formValue(formData: FormData) {
@@ -23,6 +22,7 @@ function formValue(formData: FormData) {
     foreignProcessingPlant: text("foreignProcessingPlant"),
     partNameCode: text("partNameCode"),
     foreignSlaughterDate: text("foreignSlaughterDate"),
+    expirationDate: text("expirationDate"),
     memo: text("memo"),
     isActive: formData.get("isActive") === "on",
   };
@@ -77,23 +77,13 @@ async function validatedHistoryData(formData: FormData) {
     select: { name: true, category: true, unit: true },
   });
   if (!product) return { state: { status: "error", message: "연결할 제품을 찾을 수 없습니다." } as ImportHistoryFormState };
-  const goat = isGoatProduct(product);
   const historyNumber = parsed.data.historyNumber?.trim() || null;
   const billOfLadingNumber = parsed.data.billOfLadingNumber?.trim() || null;
-  if (goat && !billOfLadingNumber) {
-    return { state: { status: "error", message: "염소 수입이력은 B/L번호를 입력해 주세요.", errors: { billOfLadingNumber: ["B/L번호는 필수입니다."] } } as ImportHistoryFormState };
-  }
-  if (!goat && !historyNumber) {
-    return { state: { status: "error", message: "수입축산물 이력번호를 입력해 주세요.", errors: { historyNumber: ["이력번호는 필수입니다."] } } as ImportHistoryFormState };
-  }
-  if (!goat && !parsed.data.importDate) {
-    return { state: { status: "error", message: "수입일자를 입력해 주세요.", errors: { importDate: ["수입일자는 필수입니다."] } } as ImportHistoryFormState };
-  }
-  if (!goat && !parsed.data.countryOfOrigin?.trim()) {
+  if (!parsed.data.countryOfOrigin?.trim()) {
     return { state: { status: "error", message: "원산지를 입력해 주세요.", errors: { countryOfOrigin: ["원산지는 필수입니다."] } } as ImportHistoryFormState };
   }
-  if (!goat && !parsed.data.supplierName?.trim()) {
-    return { state: { status: "error", message: "공급처를 입력해 주세요.", errors: { supplierName: ["공급처는 필수입니다."] } } as ImportHistoryFormState };
+  if (!billOfLadingNumber) {
+    return { state: { status: "error", message: "B/L번호를 입력해 주세요.", errors: { billOfLadingNumber: ["B/L번호는 필수입니다."] } } as ImportHistoryFormState };
   }
   return {
     data: {
@@ -109,6 +99,7 @@ async function validatedHistoryData(formData: FormData) {
       foreignProcessingPlant: parsed.data.foreignProcessingPlant?.trim() || null,
       partNameCode: parsed.data.partNameCode?.trim() || null,
       foreignSlaughterDate: parsed.data.foreignSlaughterDate ?? null,
+      expirationDate: parsed.data.expirationDate ?? null,
       memo: parsed.data.memo?.trim() || null,
     },
   };
@@ -130,9 +121,7 @@ export async function createImportHistory(_previous: ImportHistoryFormState, for
   revalidateImportHistoryPaths(validated.data.productId);
   return {
     status: "success",
-    message: validated.data.historyNumber
-      ? "수입축산물 이력을 등록했습니다."
-      : `염소 수입이력을 B/L번호 ${validated.data.billOfLadingNumber}로 등록했습니다.`,
+    message: "수입축산물 이력을 등록했습니다.",
   };
 }
 
