@@ -7,7 +7,11 @@ export function isGoatProduct(product: GoatProductFields) {
 
 /** 공공 이력 API가 제공되는 축종(소·돼지)인지 판별합니다. */
 export function supportsAnimalTraceLookup(product: GoatProductFields) {
+  const category = product.category.trim().toLocaleLowerCase();
+  if (["양", "염소", "lamb", "mutton", "goat"].includes(category)) return false;
+  if (["소", "돼지", "beef", "pork"].includes(category)) return true;
+
   const value = [product.name, product.category, product.unit].join(" ").toLocaleLowerCase();
   if (["염소", "양고기", "면양", "lamb", "mutton", "goat"].some((keyword) => value.includes(keyword))) return false;
-  return ["돼지", "돈육", "pork", "소고기", "쇠고기", "우육", "beef"].some((keyword) => value.includes(keyword));
+  return ["돼지", "돈육", "돈", "pork", "소고기", "쇠고기", "우육", "beef"].some((keyword) => value.includes(keyword));
 }

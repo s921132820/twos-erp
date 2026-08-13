@@ -1,27 +1,29 @@
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import type { ProductSearchType } from "@/lib/products/queries";
 
 type ProductPaginationProps = {
   page: number;
   totalPages: number;
   size: number;
-  query?: string;
+  keyword?: string;
+  searchType: ProductSearchType;
   category?: string;
 };
 
-function href({ page, size, query, category }: Omit<ProductPaginationProps, "totalPages">) {
-  const params = new URLSearchParams({ page: String(page), size: String(size) });
-  if (query) params.set("query", query);
+function href({ page, size, keyword, searchType, category }: Omit<ProductPaginationProps, "totalPages">) {
+  const params = new URLSearchParams({ page: String(page), size: String(size), searchType });
+  if (keyword) params.set("keyword", keyword);
   if (category) params.set("category", category);
   return `/products?${params.toString()}`;
 }
 
-export function ProductPagination({ page, totalPages, size, query, category }: ProductPaginationProps) {
+export function ProductPagination({ page, totalPages, size, keyword, searchType, category }: ProductPaginationProps) {
   const start = Math.max(1, Math.min(page - 2, totalPages - 4));
   const end = Math.min(totalPages, start + 4);
   const pages = Array.from({ length: Math.max(0, end - start + 1) }, (_, index) => start + index);
-  const pageHref = (targetPage: number) => href({ page: targetPage, size, query, category });
+  const pageHref = (targetPage: number) => href({ page: targetPage, size, keyword, searchType, category });
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
