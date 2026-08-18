@@ -29,6 +29,7 @@ export type CoupangWingOrderRow = {
 export type SmartStoreOrderRow = {
   receiverName: string;
   productName: string;
+  optionInfo: string;
   integratedAddress: string;
   buyerPhoneNumber: string;
   postalCode: string;

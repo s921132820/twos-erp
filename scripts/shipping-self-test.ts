@@ -9,6 +9,7 @@ import { parseCoupangWingWorkbook } from "../lib/shipping/parse-coupang-wing-exc
 import { parseMarketplaceExcel } from "../lib/shipping/parse-marketplace-excel";
 import { parseMeatboxWorkbook } from "../lib/shipping/parse-meatbox-excel";
 import { parseEncryptedSmartStoreExcel } from "../lib/shipping/parse-encrypted-smart-store-excel";
+import { buildSmartStoreProductName } from "../lib/shipping/convert-smart-store-to-hanjin";
 import { parseMeatfriendsWorkbook } from "../lib/shipping/parse-meatfriends-excel";
 import { convertMeatfriendsRowToHanjinRow, joinAddressParts } from "../lib/shipping/convert-meatfriends-to-hanjin";
 import { isHtmlTableFile, normalizeHtmlCellText, parseHtmlTableRows, parseMeatfriendsFile } from "../lib/shipping/parse-meatfriends-file";
@@ -24,6 +25,9 @@ assert.equal(combineProductNameAndWeight("돈삼겹살", ""), "돈삼겹살");
 assert.equal(combineProductNameAndWeight("", "10.35"), "10.35kg");
 assert.equal(combineProductNameAndWeight(null, undefined), "");
 assert.equal(normalizeProductNumber(" 285058 "), "285058");
+assert.equal(buildSmartStoreProductName("LA갈비 선물세트", "2kg"), "LA갈비 선물세트 / 2kg");
+assert.equal(buildSmartStoreProductName("갈비탕", ""), "갈비탕");
+assert.equal(buildSmartStoreProductName("소갈비살", "  1.5kg  "), "소갈비살 / 1.5kg");
 assert.equal(getMeatboxProductLabel(285058), "(박피)");
 assert.equal(getMeatboxProductLabel(" 285055 "), "(암)");
 assert.equal(getMeatboxProductLabel("217548"), "(수)");
@@ -267,12 +271,12 @@ const smartStoreWorkbook = XLSX.utils.book_new();
 XLSX.utils.book_append_sheet(smartStoreWorkbook, XLSX.utils.aoa_to_sheet([["수취인명", "상품명", "통합배송지", "구매자연락처"]]), "안내");
 XLSX.utils.book_append_sheet(smartStoreWorkbook, XLSX.utils.aoa_to_sheet([
   ["스마트스토어 발주 목록"],
-  [" 수취인 명 ", "상품명", "통합\n배송지", "구매자 연락처", "우편번호", "배송 메시지"],
-  ["박하나", "스마트 상품1", "대전시", "010-1111-2222", "01234", "문 앞"],
-  ["박둘", "스마트 상품2", "대구시", "01033334444", "23456", ""],
-  ["박셋", "스마트 상품3", "광주시", "01055556666", "34567", "경비실"],
-  ["", "스마트 상품4", "", "01077778888", "", ""],
-  ["", "", "", "", "", ""],
+  [" 수취인 명 ", "상품명", "옵션정보", "통합\n배송지", "구매자 연락처", "우편번호", "배송 메시지"],
+  ["박하나", "스마트 상품1", "900g", "대전시", "010-1111-2222", "01234", "문 앞"],
+  ["박둘", "스마트 상품2", "", "대구시", "01033334444", "23456", ""],
+  ["박셋", "스마트 상품3", "  5팩  ", "광주시", "01055556666", "34567", "경비실"],
+  ["", "스마트 상품4", "", "", "01077778888", "", ""],
+  ["", "", "", "", "", "", ""],
 ]), "주문");
 const smartPlain = XLSX.write(smartStoreWorkbook, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
 const populateWorkbook = await XlsxPopulate.fromDataAsync(smartPlain);
@@ -283,7 +287,12 @@ assert.equal(sourcedSmartStore.length, 4);
 assert.equal(sourcedSmartStore[0]?.source, "smart-store");
 assert.equal(sourcedSmartStore[0]?.sourceRowNumber, 3);
 assert.equal(sourcedSmartStore[0]?.receiverName, "박하나");
-assert.equal(sourcedSmartStore[0]?.productName, "스마트 상품1");
+assert.equal(sourcedSmartStore[0]?.productName, "스마트 상품1 / 900g");
+assert.equal(sourcedSmartStore[1]?.productName, "스마트 상품2");
+assert.equal(sourcedSmartStore[2]?.productName, "스마트 상품3 / 5팩");
+const smartStoreProductGroups = groupShippingRowsByProduct(sourcedSmartStore);
+assert.ok(smartStoreProductGroups.some((group) => group.productName === "스마트 상품1 / 900g"));
+assert.ok(smartStoreProductGroups.some((group) => group.productName === "스마트 상품3 / 5팩"));
 assert.equal(sourcedSmartStore[0]?.address, "대전시");
 assert.equal(sourcedSmartStore[0]?.mobilePhone, "010-1111-2222");
 assert.equal(sourcedSmartStore[0]?.postalCode, "01234");
@@ -306,7 +315,7 @@ assert.equal(allData[6]?.[0], "박하나");
 assert.equal(allData[6]?.[3], "010-1111-2222");
 assert.equal(allData[6]?.[3], allData[6]?.[4]);
 assert.equal(allData[6]?.[5], 1);
-assert.equal(allData[6]?.[8], "스마트 상품1");
+assert.equal(allData[6]?.[8], "스마트 상품1 / 900g");
 assert.equal(allData[7]?.[10], DEFAULT_DELIVERY_MESSAGE);
 for (const row of allData.slice(1)) assert.equal(row[3], row[4]);
 }

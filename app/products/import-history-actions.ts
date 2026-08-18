@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { requiresImportTraceNumber } from "@/lib/products/import-trace-requirement";
 import { importLivestockHistorySchema, type ImportHistoryFormState } from "@/lib/validations/import-livestock-history";
 
 function formValue(formData: FormData) {
@@ -81,6 +82,15 @@ async function validatedHistoryData(formData: FormData) {
   const billOfLadingNumber = parsed.data.billOfLadingNumber?.trim() || null;
   if (!parsed.data.countryOfOrigin?.trim()) {
     return { state: { status: "error", message: "원산지를 입력해 주세요.", errors: { countryOfOrigin: ["원산지는 필수입니다."] } } as ImportHistoryFormState };
+  }
+  if (requiresImportTraceNumber({ category: product.category, countryOfOrigin: parsed.data.countryOfOrigin }) && !historyNumber) {
+    return {
+      state: {
+        status: "error",
+        message: "수입 소·돼지는 수입축산물 이력번호가 필요합니다.",
+        errors: { historyNumber: ["수입축산물 이력번호를 입력해 주세요."] },
+      } as ImportHistoryFormState,
+    };
   }
   if (!billOfLadingNumber) {
     return { state: { status: "error", message: "B/L번호를 입력해 주세요.", errors: { billOfLadingNumber: ["B/L번호는 필수입니다."] } } as ImportHistoryFormState };

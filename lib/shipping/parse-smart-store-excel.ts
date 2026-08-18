@@ -3,7 +3,7 @@ import { cellDisplayValue, normalizeHeader, normalizePhoneNumber, normalizePosta
 import type { ParsedOrderRow, SmartStoreOrderRow } from "./types";
 
 const HEADER_ALIASES = {
-  receiverName: ["수취인명", "수취인 명"], productName: ["상품명"],
+  receiverName: ["수취인명", "수취인 명"], productName: ["상품명"], optionInfo: ["옵션정보", "옵션 정보"],
   integratedAddress: ["통합배송지", "통합 배송지"], buyerPhoneNumber: ["구매자연락처", "구매자 연락처"],
   postalCode: ["우편번호"], deliveryMessage: ["배송메세지", "배송 메시지"],
 } as const;
@@ -49,7 +49,7 @@ export function parseSmartStoreWorkbook(workbook: XLSX.WorkBook): ParsedOrderRow
   const read = (row: number, key: HeaderKey) => cell(header.sheet, row, header.columns.get(key));
   for (let rowIndex = header.row + 1; rowIndex <= range.e.r; rowIndex += 1) {
     const row: SmartStoreOrderRow = {
-      receiverName: toSafeString(read(rowIndex, "receiverName")), productName: toSafeString(read(rowIndex, "productName")),
+      receiverName: toSafeString(read(rowIndex, "receiverName")), productName: toSafeString(read(rowIndex, "productName")), optionInfo: toSafeString(read(rowIndex, "optionInfo")),
       integratedAddress: toSafeString(read(rowIndex, "integratedAddress")), buyerPhoneNumber: normalizePhoneNumber(read(rowIndex, "buyerPhoneNumber")),
       postalCode: normalizePostalCode(read(rowIndex, "postalCode")), deliveryMessage: toSafeString(read(rowIndex, "deliveryMessage")),
     };

@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { initialImportHistoryFormState } from "@/lib/validations/import-livestock-history";
 import { supportsAnimalTraceLookup } from "@/lib/products/is-goat-product";
+import { requiresImportTraceNumber } from "@/lib/products/import-trace-requirement";
 
 export type ProductWithImportHistories = Prisma.ProductGetPayload<{ include: { importLivestockHistories: true } }>;
 
@@ -42,6 +43,7 @@ function HistoryForm({ product, history, onSuccess, onCancel, onDirtyChange }: {
     isActive: history?.isActive ?? true,
   }), [history]);
   const [values, setValues] = useState(initialValues);
+  const historyNumberRequired = requiresImportTraceNumber({ category: product.category, countryOfOrigin: values.countryOfOrigin });
   useEffect(() => onDirtyChange(JSON.stringify(values) !== JSON.stringify(initialValues)), [initialValues, onDirtyChange, values]);
   useEffect(() => {
     if (state.status === "success") onSuccess(state.message);
@@ -99,7 +101,7 @@ function HistoryForm({ product, history, onSuccess, onCancel, onDirtyChange }: {
   }} className="space-y-4">
     <input type="hidden" name="productId" value={productId} />
     {state.status === "error" && <div role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700">{state.message}</div>}
-    <div className={lookupSupported ? "rounded-lg border border-blue-100 bg-blue-50 p-4" : "rounded-lg border border-amber-200 bg-amber-50 p-4"}><p className={lookupSupported ? "text-sm font-semibold text-blue-900" : "text-sm font-semibold text-amber-900"}>이력번호 공공데이터 조회 <span className="font-normal">(선택)</span></p><p className={lookupSupported ? "mt-1 text-xs leading-5 text-blue-700" : "mt-1 text-xs leading-5 text-amber-800"}>{lookupSupported ? "소·돼지 이력번호가 있으면 조회하여 제공되는 정보를 자동으로 채울 수 있습니다." : "양·염소는 공공데이터 조회 대상이 아니지만, 이력번호는 직접 입력할 수 있습니다."}</p><div className="mt-3 flex gap-2"><Input name="historyNumber" value={values.historyNumber} onChange={(event) => change("historyNumber", event.target.value)} maxLength={50} placeholder="수입축산물 이력번호 (선택)" className="bg-white" /><Button type="button" onClick={lookup} disabled={!lookupSupported || lookingUp}><Search size={16} />{lookingUp ? "조회 중..." : "공공 API 조회"}</Button></div>{lookupMessage && <p role="status" className="mt-2 text-xs font-medium text-blue-800">{lookupMessage}</p>}<FieldError messages={state.errors?.historyNumber} /></div>
+    <div className={lookupSupported ? "rounded-lg border border-blue-100 bg-blue-50 p-4" : "rounded-lg border border-amber-200 bg-amber-50 p-4"}><p className={lookupSupported ? "text-sm font-semibold text-blue-900" : "text-sm font-semibold text-amber-900"}>수입축산물 이력번호 {historyNumberRequired && <span className="text-red-500">*</span>} <span className="font-normal">(공공데이터 조회는 선택)</span></p><p className={lookupSupported ? "mt-1 text-xs leading-5 text-blue-700" : "mt-1 text-xs leading-5 text-amber-800"}>{lookupSupported ? "수입산 소·돼지는 이력번호가 필수이며, 조회 버튼으로 제공 정보를 자동 입력할 수 있습니다." : "양·염소는 공공데이터 조회 대상이 아니며 이력번호 없이도 직접 입력하여 등록할 수 있습니다."}</p><div className="mt-3 flex gap-2"><Input required={historyNumberRequired} name="historyNumber" value={values.historyNumber} onChange={(event) => change("historyNumber", event.target.value)} maxLength={50} placeholder={historyNumberRequired ? "수입축산물 이력번호 (필수)" : "수입축산물 이력번호 (선택)"} className="bg-white" /><Button type="button" onClick={lookup} disabled={!lookupSupported || lookingUp}><Search size={16} />{lookingUp ? "조회 중..." : "공공 API 조회"}</Button></div>{lookupMessage && <p role="status" className="mt-2 text-xs font-medium text-blue-800">{lookupMessage}</p>}<FieldError messages={state.errors?.historyNumber} /></div>
     <div className="grid gap-4 md:grid-cols-2">
       <label className="text-sm font-medium text-slate-700">수입일자<Input type="date" name="importDate" value={values.importDate} onChange={(event) => change("importDate", event.target.value)} className="mt-1.5 bg-white" /><FieldError messages={state.errors?.importDate} /></label>
       <label className="text-sm font-medium text-slate-700">원산지 <span className="text-red-500">*</span><Input required name="countryOfOrigin" value={values.countryOfOrigin} onChange={(event) => change("countryOfOrigin", event.target.value)} maxLength={100} className="mt-1.5 bg-white" /><FieldError messages={state.errors?.countryOfOrigin} /></label>
