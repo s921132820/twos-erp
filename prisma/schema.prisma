@@ -10,13 +10,13 @@ model Product {
   id                       String                   @id @map("p_id") @db.VarChar(10)
   code                     String                   @map("report_number") @db.VarChar(20)
   unit                     String                   @map("product_type") @db.VarChar(50)
-  kind                     String                   @default("포장육") @map("product_kind") @db.VarChar(50)
   description              String                   @map("expiration_period") @db.VarChar(100)
   name                     String                   @map("product_name") @db.VarChar(100)
   category                 String                   @db.VarChar(50)
   material                 String?                  @db.Text
   createdAt                DateTime?                @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt                DateTime?                @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  kind                     String                   @default("포장육") @map("product_kind") @db.VarChar(50)
   importLivestockHistories ImportLivestockHistory[]
 
   @@map("products")
