@@ -18,6 +18,7 @@ function createPrismaClient(url: string) {
     throw new Error("DATABASE_URL에 사용자명과 데이터베이스명이 필요합니다.");
   }
 
+  const isLocalDatabase = ["localhost", "127.0.0.1", "::1"].includes(parsedUrl.hostname);
   const host = parsedUrl.hostname === "localhost" ? "127.0.0.1" : parsedUrl.hostname;
   const port = parsedUrl.port ? Number(parsedUrl.port) : 3306;
 
@@ -36,6 +37,9 @@ function createPrismaClient(url: string) {
     password: decodeURIComponent(parsedUrl.password),
     database,
     connectionLimit: 10,
+    // MySQL 8 caching_sha2_password needs the server RSA key when its fast-auth
+    // cache is cold. Restrict automatic key retrieval to the local DB only.
+    allowPublicKeyRetrieval: isLocalDatabase,
   });
 
   return new PrismaClient({ adapter });
