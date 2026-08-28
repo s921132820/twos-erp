@@ -10,22 +10,22 @@ import { cloneLabelPrintConfig, dotsToMm, LABEL_PRINT_CONFIGS, mmToDots, normali
 import { listQzPrinters, printTspl } from "@/lib/printing/qz-client";
 import { cn } from "@/lib/utils";
 
-type ActiveHistory = {
+export type LabelHistory = {
   id: number;
   historyNumber: string | null;
   countryOfOrigin: string | null;
   foreignSlaughterDate: string | null;
 };
 
-type LabelProduct = {
+export type LabelProduct = {
   id: string;
   name: string;
   code: string;
   material: string | null;
-  activeHistories: ActiveHistory[];
+  activeHistories: LabelHistory[];
 };
 
-type LabelSelection = { product: LabelProduct; history: ActiveHistory };
+export type LabelSelection = { product: LabelProduct; history: LabelHistory };
 
 type Tab = "box" | "vacuum" | "meatbox";
 const tabs: Array<{ id: Tab; label: string }> = [
@@ -96,7 +96,7 @@ function shortDate(value: string) {
   return value ? value.slice(2).replaceAll("-", ".") : "";
 }
 
-function defaultLabelData(today: string, product?: LabelProduct, history?: ActiveHistory): BoxLabelPrintData {
+function defaultLabelData(today: string, product?: LabelProduct, history?: LabelHistory): BoxLabelPrintData {
   const expirationDate = addMonths(history?.foreignSlaughterDate ?? null, 24);
   return {
     productName: product?.name ?? "",
@@ -174,11 +174,11 @@ function CanvasPreview({ data, layout, selectedField, onSelectField }: { data: B
   </>;
 }
 
-export function LabelPrinterWorkspace() {
+export function LabelPrinterWorkspace({ initialSelection }: { initialSelection?: LabelSelection }) {
   const [tab, setTab] = useState<Tab>("box");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<LabelProduct[]>([]);
-  const [selected, setSelected] = useState<LabelSelection | null>(null);
+  const [selected, setSelected] = useState<LabelSelection | null>(initialSelection ?? null);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState("");
@@ -193,8 +193,8 @@ export function LabelPrinterWorkspace() {
   const [selectedField, setSelectedField] = useState<LabelFieldKey>("productName");
   const [fieldSearch, setFieldSearch] = useState("");
   const [movementStep, setMovementStep] = useState(1);
-  const [labelData, setLabelData] = useState<BoxLabelPrintData>(() => defaultLabelData(dateInSeoul()));
-  const [sourceLabelData, setSourceLabelData] = useState<BoxLabelPrintData>(() => defaultLabelData(dateInSeoul()));
+  const [labelData, setLabelData] = useState<BoxLabelPrintData>(() => defaultLabelData(dateInSeoul(), initialSelection?.product, initialSelection?.history));
+  const [sourceLabelData, setSourceLabelData] = useState<BoxLabelPrintData>(() => defaultLabelData(dateInSeoul(), initialSelection?.product, initialSelection?.history));
   const initialLayoutRef = useRef<LabelPrintConfig>(cloneLabelPrintConfig(LABEL_PRINT_CONFIGS.box20kg));
   const printInProgress = useRef(false);
   const today = dateInSeoul();
@@ -246,7 +246,7 @@ export function LabelPrinterWorkspace() {
     return messages;
   });
 
-  const selectHistory = (product: LabelProduct, history: ActiveHistory) => {
+  const selectHistory = (product: LabelProduct, history: LabelHistory) => {
     const values = defaultLabelData(today, product, history);
     setSelected({ product, history });
     setSourceLabelData(values);
@@ -414,7 +414,7 @@ export function LabelPrinterWorkspace() {
 
   return (
     <section className="space-y-5">
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      {!initialSelection && <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <form onSubmit={search} className="flex flex-col gap-2 sm:flex-row">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={17} />
@@ -434,7 +434,7 @@ export function LabelPrinterWorkspace() {
             })}</div> : <span className="mt-2 inline-block rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">사용 중인 이력 없음</span>}
           </div>
         ))}</div>}
-      </div>
+      </div>}
 
       <div className="screen-only flex overflow-x-auto border-b border-slate-200" role="tablist">{tabs.map((item) => <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} onClick={() => setTab(item.id)} className={cn("whitespace-nowrap border-b-2 px-5 py-3 text-sm font-semibold", tab === item.id ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-800")}>{item.label}</button>)}</div>
 

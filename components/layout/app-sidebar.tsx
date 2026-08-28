@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Building2, Home, Package, Printer, Truck } from "lucide-react";
+import { Building2, Home, Package, Truck } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
@@ -11,7 +11,6 @@ export function AppSidebar() {
     { href: "/", label: "홈", icon: Home, active: pathname === "/" },
     { href: "/clients", label: "거래처", icon: Building2, active: pathname.startsWith("/clients") },
     { href: "/products", label: "우리 제품", icon: Package, active: pathname.startsWith("/products") },
-    { href: "/label-printer", label: "라벨 프린터", icon: Printer, active: pathname.startsWith("/label-printer") },
     { href: "/shipping-labels", label: "택배 송장", icon: Truck, active: pathname.startsWith("/shipping-labels") },
   ];
 

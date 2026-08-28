@@ -58,7 +58,7 @@ function historyOperationError(
 }
 
 function revalidateImportHistoryPaths(productId: string) {
-  for (const path of ["/products", `/products/${productId}/import-histories`, "/label-printer"]) {
+  for (const path of ["/products", `/products/${productId}`, `/products/${productId}/import-histories`, "/label-printer"]) {
     try {
       revalidatePath(path);
     } catch (error) {

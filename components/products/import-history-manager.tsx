@@ -4,6 +4,7 @@ import { startTransition, useActionState, useCallback, useEffect, useMemo, useSt
 import * as Dialog from "@radix-ui/react-dialog";
 import type { ImportLivestockHistory, Prisma } from "@prisma/client";
 import { Plus, Search, X } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { createImportHistory, deleteImportHistory, updateImportHistory } from "@/app/products/import-history-actions";
@@ -143,7 +144,7 @@ export function ImportHistoryManager({ product }: { product: ProductWithImportHi
   };
 
   return <div className="space-y-5">
-    <div className="flex justify-end"><Button onClick={() => { setEditing(undefined); setDirty(false); setOpen(true); }}><Plus size={16} />새 이력 등록</Button></div>
+    <div className="flex justify-end"><Button onClick={() => { setEditing(undefined); setDirty(false); setOpen(true); }}><Plus size={16} />이력 추가</Button></div>
     <Dialog.Root open={open} onOpenChange={(nextOpen) => { if (!nextOpen) requestClose(); }}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-slate-950/45" />
@@ -157,15 +158,21 @@ export function ImportHistoryManager({ product }: { product: ProductWithImportHi
     {product.importLivestockHistories.length === 0 ? (
       <div className="flex min-h-56 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white text-sm text-slate-500">등록된 수입축산물 이력이 없습니다.</div>
     ) : (
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white"><table className="w-full min-w-[1300px] text-left text-sm">
-        <thead className="bg-slate-50 text-xs font-semibold text-slate-500"><tr>{["이력번호 / B/L", "수입일자", "유통기한", "원산지", "공급처", "수입 상세정보", "메모", "상태", "관리"].map((item) => <th key={item} className="px-5 py-3.5">{item}</th>)}</tr></thead>
+      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white"><table className="w-full min-w-[2400px] text-left text-sm">
+        <thead className="bg-slate-50 text-xs font-semibold text-slate-500"><tr>{["이력번호", "수입일", "원산지", "공급업체", "품목명", "B/L 번호", "수출업체", "해외 도축장", "해외 가공장", "부위명/부위코드", "해외 도축일", "소비기한", "사용 여부", "관리"].map((item) => <th key={item} className="whitespace-nowrap px-5 py-3.5">{item}</th>)}</tr></thead>
         <tbody className="divide-y divide-slate-100">{product.importLivestockHistories.map((history) => <tr key={history.id}>
-          <td className="px-5 py-4 font-semibold text-slate-900">{history.historyNumber || (history.billOfLadingNumber ? `B/L ${history.billOfLadingNumber}` : "-")}</td>
-          <td className="px-5 py-4 text-slate-600">{history.importDate ? new Intl.DateTimeFormat("ko-KR").format(history.importDate) : "-"}</td>
-          <td className="px-5 py-4 text-slate-600">{history.expirationDate ? new Intl.DateTimeFormat("ko-KR").format(history.expirationDate) : "-"}</td>
-          <td className="px-5 py-4 text-slate-600">{history.countryOfOrigin || "-"}</td><td className="px-5 py-4 text-slate-600">{history.supplierName || "-"}</td>
-          <td className="min-w-72 px-5 py-4 text-xs leading-5 text-slate-600"><p><strong>품목:</strong> {history.itemName || "-"}</p><p><strong>B/L:</strong> {history.billOfLadingNumber || "-"}</p><p><strong>수출업체:</strong> {history.exporterName || "-"}</p><p><strong>도축장:</strong> {history.foreignSlaughterhouse || "-"}</p><p><strong>가공장:</strong> {history.foreignProcessingPlant || "-"}</p><p><strong>부위:</strong> {history.partNameCode || "-"}</p><p><strong>도축일자:</strong> {history.foreignSlaughterDate ? history.foreignSlaughterDate.toISOString().slice(0, 10) : "-"}</p></td>
-          <td className="max-w-60 whitespace-pre-wrap px-5 py-4 text-slate-600">{history.memo || "-"}</td>
+          <td className="whitespace-nowrap px-5 py-4"><Link href={`/products/${encodeURIComponent(product.id)}/histories/${history.id}`} className="font-bold text-blue-700 underline-offset-4 hover:underline">{history.historyNumber || `이력 #${history.id}`}</Link></td>
+          <td className="whitespace-nowrap px-5 py-4 text-slate-600">{history.importDate ? new Intl.DateTimeFormat("ko-KR").format(history.importDate) : "-"}</td>
+          <td className="px-5 py-4 text-slate-600">{history.countryOfOrigin || "-"}</td>
+          <td className="px-5 py-4 text-slate-600">{history.supplierName || "-"}</td>
+          <td className="px-5 py-4 text-slate-600">{history.itemName || "-"}</td>
+          <td className="px-5 py-4 text-slate-600">{history.billOfLadingNumber || "-"}</td>
+          <td className="px-5 py-4 text-slate-600">{history.exporterName || "-"}</td>
+          <td className="min-w-56 whitespace-pre-wrap px-5 py-4 text-slate-600">{history.foreignSlaughterhouse || "-"}</td>
+          <td className="min-w-56 whitespace-pre-wrap px-5 py-4 text-slate-600">{history.foreignProcessingPlant || "-"}</td>
+          <td className="px-5 py-4 text-slate-600">{history.partNameCode || "-"}</td>
+          <td className="whitespace-nowrap px-5 py-4 text-slate-600">{history.foreignSlaughterDate ? new Intl.DateTimeFormat("ko-KR").format(history.foreignSlaughterDate) : "-"}</td>
+          <td className="whitespace-nowrap px-5 py-4 text-slate-600">{history.expirationDate ? new Intl.DateTimeFormat("ko-KR").format(history.expirationDate) : "-"}</td>
           <td className="px-5 py-4"><span className={history.isActive ? "rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700" : "rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-500"}>{history.isActive ? "사용" : "미사용"}</span></td>
           <td className="whitespace-nowrap px-5 py-4"><Button size="sm" variant="ghost" onClick={() => { setEditing(history); setDirty(false); setOpen(true); }}>수정</Button><Button size="sm" variant="ghost" className="text-red-600" disabled={deleting} onClick={() => remove(history)}>삭제</Button></td>
         </tr>)}</tbody>

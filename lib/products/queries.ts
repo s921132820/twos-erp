@@ -65,3 +65,10 @@ export async function getProductWithImportHistories(productId: string) {
     },
   });
 }
+
+export async function getProductHistory(productId: string, historyId: number) {
+  return prisma.importLivestockHistory.findFirst({
+    where: { id: historyId, productId },
+    include: { product: true },
+  });
+}

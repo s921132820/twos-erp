@@ -16,7 +16,7 @@ export function ProductTable({ products, page, size }: { products: ProductWithIm
   }
 
   const headers = ["번호", "제품 ID", "품목보고번호", "제품명", "제품유형", "종류", "소비기한", "카테고리", "등록일", "관리"];
-  const productHref = (productId: string) => `/products/${encodeURIComponent(productId)}/import-histories`;
+  const productHref = (productId: string) => `/products/${encodeURIComponent(productId)}`;
   const openProduct = (productId: string) => router.push(productHref(productId));
   const handleRowClick = (event: MouseEvent<HTMLTableRowElement>, productId: string) => {
     if ((event.target as HTMLElement).closest("button, a, input, select, textarea, [role='button']")) return;
