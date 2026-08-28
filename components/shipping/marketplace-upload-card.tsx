@@ -24,5 +24,6 @@ export function MarketplaceUploadCard({ marketplace, state, onFile, onRemove }: 
       <div className="mt-auto flex gap-1.5 pt-2"><Button type="button" size="sm" variant="outline" disabled={state.isLoading} onClick={() => inputRef.current?.click()} className="h-8">파일 교체</Button><Button type="button" size="sm" variant="ghost" onClick={onRemove} className="h-8"><Trash2 size={14} />제거</Button></div>
     </div>}
     {state.error && <div role="alert" className="mt-2 max-h-24 overflow-auto whitespace-pre-line rounded-md border border-red-200 bg-red-50 p-2 text-xs text-red-700">{state.error}</div>}
+    {state.notice && <div role="status" className="mt-2 max-h-36 overflow-auto whitespace-pre-line rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">{state.notice}</div>}
   </article>;
 }

@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { MARKETPLACE_LABELS } from "@/lib/shipping/marketplace-detector";
 import { createInitialManualForm, createManualShippingRow } from "@/lib/shipping/manual-shipping";
-import { parseMarketplaceExcel } from "@/lib/shipping/parse-marketplace-excel";
+import { parseMarketplaceExcelWithReport } from "@/lib/shipping/parse-marketplace-excel";
 import { parseEncryptedSmartStoreExcel } from "@/lib/shipping/parse-encrypted-smart-store-excel";
 import { parseMeatfriendsFile } from "@/lib/shipping/parse-meatfriends-file";
 import { groupShippingRowsByProduct } from "@/lib/shipping/product-summary";
@@ -20,7 +20,14 @@ import { ShippingRowEditDialog } from "./shipping-row-edit-dialog";
 import { ShippingSummary } from "./shipping-summary";
 
 const ACCEPTED_EXTENSIONS = [".xlsx", ".xls"];
-const createInitialUploadState = (): MarketplaceUploadState => ({ file: null, fileName: "", rows: [], error: null, isLoading: false, status: "idle" });
+const createInitialUploadState = (): MarketplaceUploadState => ({ file: null, fileName: "", rows: [], error: null, notice: null, isLoading: false, status: "idle" });
+
+function meatboxFilterNotice(report: NonNullable<ReturnType<typeof parseMarketplaceExcelWithReport>["meatboxReport"]>): string | null {
+  if (!report.excludedCount) return null;
+  const details = Object.entries(report.excludedDateCounts).sort(([left], [right]) => left.localeCompare(right)).map(([date, count]) => `- ${date}: ${count}건`);
+  if (report.invalidDateCount) details.push(`- 날짜 없음/인식 실패: ${report.invalidDateCount}건`);
+  return [`출고예정일자를 확인해 주세요.`, `오늘(${report.today}) 출고 예정이 아닌 주문 ${report.excludedCount}건을 송장 변환에서 제외했습니다.`, ...(details.length ? ["", "제외된 출고예정일자:", ...details] : [])].join("\n");
+}
 type ManualDialogState = { open: boolean; mode: ManualOrderDialogMode; editingRowId: string | null; initialValues: ManualShippingForm };
 
 export function ShippingLabelConverter() {
@@ -53,18 +60,23 @@ export function ShippingLabelConverter() {
   const handleFile = async (marketplace: MarketplaceType, file: File) => {
     clearSourceAdjustments(marketplace);
     const requestId = ++requestIds.current[marketplace];
-    const loadingState: MarketplaceUploadState = { file, fileName: file.name, rows: [], error: null, isLoading: true, status: marketplace === "smart-store" ? "decrypting" : "parsing" };
+    const loadingState: MarketplaceUploadState = { file, fileName: file.name, rows: [], error: null, notice: null, isLoading: true, status: marketplace === "smart-store" ? "decrypting" : "parsing" };
     setMarketplaceState(marketplace, loadingState);
     const validExtension = marketplace === "smart-store" ? file.name.toLowerCase().endsWith(".xlsx") : ACCEPTED_EXTENSIONS.some((extension) => file.name.toLowerCase().endsWith(extension));
     if (!validExtension) { const message = marketplace === "smart-store" ? "암호화된 스마트스토어 .xlsx 파일만 업로드할 수 있습니다." : ".xlsx 또는 .xls 파일만 업로드할 수 있습니다."; if (requestIds.current[marketplace] === requestId) setMarketplaceState(marketplace, { ...loadingState, error: message, isLoading: false, status: "error" }); return; }
     try {
       const data = await file.arrayBuffer();
-      const rows = marketplace === "smart-store" ? await parseEncryptedSmartStoreExcel(data, file.name, () => { if (requestIds.current[marketplace] === requestId) setMarketplaceState(marketplace, { ...loadingState, status: "parsing" }); }) : marketplace === "meatfriends" ? parseMeatfriendsFile(data, file.name) : parseMarketplaceExcel(data, marketplace, file.name);
-      const error = rows.length ? null : "변환할 주문 데이터가 없습니다.";
+      const parsed = marketplace === "smart-store" ? { rows: await parseEncryptedSmartStoreExcel(data, file.name, () => { if (requestIds.current[marketplace] === requestId) setMarketplaceState(marketplace, { ...loadingState, status: "parsing" }); }), meatboxReport: null } : marketplace === "meatfriends" ? { rows: parseMeatfriendsFile(data, file.name), meatboxReport: null } : parseMarketplaceExcelWithReport(data, marketplace, file.name);
+      const { rows, meatboxReport } = parsed;
+      const notice = meatboxReport ? meatboxFilterNotice(meatboxReport) : null;
+      const error = meatboxReport && rows.length === 0
+        ? `오늘 출고 예정인 주문이 없습니다.\n\n업로드한 미트박스 파일에 오늘(${meatboxReport.today}) 출고 예정인 주문이 없습니다.\n\n출고예정일자를 확인해 주세요.`
+        : rows.length ? null : "변환할 주문 데이터가 없습니다.";
       if (requestIds.current[marketplace] !== requestId) return;
-      setMarketplaceState(marketplace, { file, fileName: file.name, rows, error, isLoading: false, status: error ? "error" : "success" });
+      setMarketplaceState(marketplace, { file, fileName: file.name, rows, error, notice, isLoading: false, status: error ? "error" : "success" });
+      if (notice) toast.warning(`미트박스 주문 ${meatboxReport!.excludedCount}건을 출고예정일자 기준으로 제외했습니다.`);
       if (rows.length) toast.success(`${MARKETPLACE_LABELS[marketplace]} 주문 ${rows.length}건을 변환했습니다.`);
-    } catch (cause) { if (requestIds.current[marketplace] === requestId) setMarketplaceState(marketplace, { file, fileName: file.name, rows: [], error: cause instanceof Error ? cause.message : "엑셀 파일을 처리하지 못했습니다.", isLoading: false, status: "error" }); }
+    } catch (cause) { if (requestIds.current[marketplace] === requestId) setMarketplaceState(marketplace, { file, fileName: file.name, rows: [], error: cause instanceof Error ? cause.message : "엑셀 파일을 처리하지 못했습니다.", notice: null, isLoading: false, status: "error" }); }
   };
   const removeMarketplace = (marketplace: MarketplaceType) => { requestIds.current[marketplace] += 1; clearSourceAdjustments(marketplace); setMarketplaceState(marketplace, createInitialUploadState()); };
   const addManual = (form: ManualShippingForm) => { const row = createManualShippingRow(form); if (!row) { toast.error("받는 분, 주소, 휴대전화, 물품명 중 하나 이상을 입력해 주세요."); return false; } setManualRows((current) => [...current, row]); toast.success("수동 주문을 추가했습니다."); return true; };

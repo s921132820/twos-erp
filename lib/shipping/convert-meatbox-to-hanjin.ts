@@ -35,6 +35,10 @@ export function combineProductNameAndWeight(productName: unknown, measuredWeight
   return buildMeatboxProductName({ productName, productLabel: getMeatboxProductLabel(productNumber), weight: measuredWeight });
 }
 
+export function combineMeatboxDeliveryMessage(deliveryMessage: unknown, note: unknown): string {
+  return [...new Set([toSafeString(deliveryMessage), toSafeString(note)].filter(Boolean))].join(" / ");
+}
+
 export function convertMeatboxRowToHanjinRow(row: MeatboxOrderRow): HanjinShippingRow {
   const contact = normalizePhoneNumber(row.receiverContact);
   return {
@@ -48,7 +52,7 @@ export function convertMeatboxRowToHanjinRow(row: MeatboxOrderRow): HanjinShippi
     emptyColumn2: "",
     productName: combineProductNameAndWeight(row.productName, row.measuredWeight, row.productNumber),
     emptyColumn3: "",
-    deliveryMessage: normalizeDeliveryMessage(row.deliveryPrecautions),
+    deliveryMessage: normalizeDeliveryMessage(combineMeatboxDeliveryMessage(row.deliveryMessage, row.note)),
     shippingFareType: "",
   };
 }

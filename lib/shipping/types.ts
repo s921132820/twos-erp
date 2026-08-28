@@ -14,7 +14,8 @@ export type MeatboxOrderRow = {
   receiverContact: string;
   postalCode: string;
   shippingAddress: string;
-  deliveryPrecautions: string;
+  deliveryMessage: string;
+  note: string;
 };
 
 export type CoupangWingOrderRow = {
@@ -113,6 +114,15 @@ export type MarketplaceUploadState = {
   fileName: string;
   rows: ConvertedShippingRow[];
   error: string | null;
+  notice: string | null;
   isLoading: boolean;
   status: "idle" | "decrypting" | "parsing" | "success" | "error";
+};
+
+export type MeatboxShippingDateFilterReport = {
+  today: string;
+  includedCount: number;
+  excludedCount: number;
+  invalidDateCount: number;
+  excludedDateCounts: Record<string, number>;
 };

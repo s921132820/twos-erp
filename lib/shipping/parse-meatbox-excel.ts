@@ -1,9 +1,9 @@
 import * as XLSX from "xlsx";
-import { cellDisplayValue, normalizeHeader, toIdentifierString, toSafeString } from "./excel-utils";
-import type { MeatboxOrderRow, ParsedOrderRow } from "./types";
+import { cellDisplayValue, formatLocalDate, normalizeExcelDate, normalizeHeader, toIdentifierString, toSafeString } from "./excel-utils";
+import type { MeatboxOrderRow, MeatboxShippingDateFilterReport, ParsedOrderRow } from "./types";
 
 const REQUIRED_HEADERS = ["상품명", "받는사람", "받는사람연락처", "배송지 주소"] as const;
-const ALL_HEADERS = [...REQUIRED_HEADERS, "상품번호", "계근중량", "우편번호", "배송시주의사항"] as const;
+const ALL_HEADERS = [...REQUIRED_HEADERS, "상품번호", "계근중량", "우편번호", "배송메세지", "비고", "출고예정일자"] as const;
 type Header = (typeof ALL_HEADERS)[number];
 
 function findHeaderRow(sheet: XLSX.WorkSheet): { row: number; columns: Map<Header, number> } | null {
@@ -24,14 +24,17 @@ function readCell(sheet: XLSX.WorkSheet, row: number, column: number | undefined
   return column === undefined ? "" : cellDisplayValue(sheet[XLSX.utils.encode_cell({ r: row, c: column })]);
 }
 
-export function parseMeatboxWorkbook(workbook: XLSX.WorkBook): ParsedOrderRow<MeatboxOrderRow>[] {
+export function parseMeatboxWorkbookWithShippingDateFilter(workbook: XLSX.WorkBook, today = new Date()): { rows: ParsedOrderRow<MeatboxOrderRow>[]; report: MeatboxShippingDateFilterReport } {
   for (const sheetName of workbook.SheetNames) {
     const sheet = workbook.Sheets[sheetName];
     if (!sheet) continue;
     const header = findHeaderRow(sheet);
     if (!header) continue;
+    if (!header.columns.has("출고예정일자")) throw new Error("필수 헤더 '출고예정일자'를 찾을 수 없습니다. 미트박스 주문 엑셀인지 확인해주세요.");
     const range = XLSX.utils.decode_range(sheet["!ref"] ?? "A1:A1");
     const rows: ParsedOrderRow<MeatboxOrderRow>[] = [];
+    const todayText = formatLocalDate(today);
+    const report: MeatboxShippingDateFilterReport = { today: todayText, includedCount: 0, excludedCount: 0, invalidDateCount: 0, excludedDateCounts: {} };
     for (let rowIndex = header.row + 1; rowIndex <= range.e.r; rowIndex += 1) {
       const value = (name: Header) => readCell(sheet, rowIndex, header.columns.get(name));
       const row: MeatboxOrderRow = {
@@ -42,13 +45,29 @@ export function parseMeatboxWorkbook(workbook: XLSX.WorkBook): ParsedOrderRow<Me
         receiverContact: toIdentifierString(value("받는사람연락처")),
         postalCode: toIdentifierString(value("우편번호")),
         shippingAddress: toSafeString(value("배송지 주소")),
-        deliveryPrecautions: toSafeString(value("배송시주의사항")),
+        deliveryMessage: toSafeString(value("배송메세지")),
+        note: toSafeString(value("비고")),
       };
-      if ([row.productName, row.receiverName, row.receiverContact, row.shippingAddress].some(Boolean)) rows.push({ row, sourceRowNumber: rowIndex + 1 });
+      if (![row.productName, row.receiverName, row.receiverContact, row.shippingAddress].some(Boolean)) continue;
+      const dateColumn = header.columns.get("출고예정일자");
+      const dateCell = dateColumn === undefined ? undefined : sheet[XLSX.utils.encode_cell({ r: rowIndex, c: dateColumn })];
+      const shippingDate = normalizeExcelDate(dateCell?.v ?? dateCell?.w);
+      if (shippingDate === todayText) {
+        rows.push({ row, sourceRowNumber: rowIndex + 1 });
+        report.includedCount += 1;
+      } else {
+        report.excludedCount += 1;
+        if (shippingDate) report.excludedDateCounts[shippingDate] = (report.excludedDateCounts[shippingDate] ?? 0) + 1;
+        else report.invalidDateCount += 1;
+      }
     }
-    return rows;
+    return { rows, report };
   }
   throw new Error("필수 헤더를 찾을 수 없습니다. 미트박스 주문 엑셀인지 확인해주세요.");
+}
+
+export function parseMeatboxWorkbook(workbook: XLSX.WorkBook): ParsedOrderRow<MeatboxOrderRow>[] {
+  return parseMeatboxWorkbookWithShippingDateFilter(workbook).rows;
 }
 
 export function parseMeatboxExcel(data: ArrayBuffer): ParsedOrderRow<MeatboxOrderRow>[] {

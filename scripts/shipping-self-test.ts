@@ -1,20 +1,20 @@
 import assert from "node:assert/strict";
 import * as XLSX from "xlsx";
 import XlsxPopulate from "xlsx-populate";
-import { combineProductNameAndWeight, convertMeatboxRowToHanjinRow, formatMeatboxWeight, getMeatboxProductLabel, needsReview, normalizeProductNumber } from "../lib/shipping/convert-meatbox-to-hanjin";
+import { combineMeatboxDeliveryMessage, combineProductNameAndWeight, convertMeatboxRowToHanjinRow, formatMeatboxWeight, getMeatboxProductLabel, needsReview, normalizeProductNumber } from "../lib/shipping/convert-meatbox-to-hanjin";
 import { createHanjinWorkbook, HANJIN_HEADERS } from "../lib/shipping/export-hanjin-excel";
 import { convertCoupangWingRowToHanjinRow } from "../lib/shipping/convert-coupang-wing-to-hanjin";
 import { detectMarketplace } from "../lib/shipping/marketplace-detector";
 import { parseCoupangWingWorkbook } from "../lib/shipping/parse-coupang-wing-excel";
 import { parseMarketplaceExcel } from "../lib/shipping/parse-marketplace-excel";
-import { parseMeatboxWorkbook } from "../lib/shipping/parse-meatbox-excel";
+import { parseMeatboxWorkbook, parseMeatboxWorkbookWithShippingDateFilter } from "../lib/shipping/parse-meatbox-excel";
 import { parseEncryptedSmartStoreExcel } from "../lib/shipping/parse-encrypted-smart-store-excel";
 import { buildSmartStoreProductName } from "../lib/shipping/convert-smart-store-to-hanjin";
 import { parseMeatfriendsWorkbook } from "../lib/shipping/parse-meatfriends-excel";
 import { convertMeatfriendsRowToHanjinRow, joinAddressParts } from "../lib/shipping/convert-meatfriends-to-hanjin";
 import { isHtmlTableFile, normalizeHtmlCellText, parseHtmlTableRows, parseMeatfriendsFile } from "../lib/shipping/parse-meatfriends-file";
 import { DEFAULT_DELIVERY_MESSAGE } from "../lib/shipping/constants";
-import { normalizeDeliveryMessage } from "../lib/shipping/excel-utils";
+import { formatLocalDate, normalizeDeliveryMessage, normalizeExcelDate } from "../lib/shipping/excel-utils";
 import { createInitialManualForm, createManualShippingRow, normalizePackageQuantity } from "../lib/shipping/manual-shipping";
 import { groupShippingRowsByProduct, normalizeProductNameForGrouping } from "../lib/shipping/product-summary";
 import { commitProductSummaryName, createEditableProductSummaries, normalizeSummaryQuantity } from "../lib/shipping/editable-product-summary";
@@ -90,13 +90,14 @@ assert.equal(typeof summaryData[1]?.[2], "number");
 assert.equal(getProductSummaryFileName(new Date(2026, 6, 29)), "물품별 집계_20260729.xlsx");
 
 const input = XLSX.utils.book_new();
+const localToday = formatLocalDate(new Date());
 XLSX.utils.book_append_sheet(input, XLSX.utils.aoa_to_sheet([["안내"]]), "안내");
 XLSX.utils.book_append_sheet(input, XLSX.utils.aoa_to_sheet([
   ["미트박스 주문현황"],
-  ["상품명", "계근중량", "받는사람", "받는사람연락처", "우편번호", "배송지 주소", "배송시주의사항"],
-  ["[호주] 염소갈비", "10.25kg", "홍길동", "01012345678", "01234", "서울시", "문 앞"],
-  ["상품만", "", "", "", "", "주소", ""],
-  ["상품3", "9.5", "김철수", "01099998888", "12345", "부산시", ""],
+  ["상품명", "계근중량", "받는사람", "받는사람연락처", "우편번호", "배송지 주소", "배송메세지", "비고", "출고예정일자"],
+  ["[호주] 염소갈비", "10.25kg", "홍길동", "01012345678", "01234", "서울시", "문 앞", "선물포장", localToday],
+  ["상품만", "", "", "", "", "주소", "", "", localToday],
+  ["상품3", "9.5", "김철수", "01099998888", "12345", "부산시", "", "", localToday],
   ["", "", "", "", "", "", ""],
 ]), "주문");
 const parsed = parseMeatboxWorkbook(input);
@@ -109,25 +110,43 @@ assert.equal(converted[0]?.phone, "01012345678");
 assert.equal(converted[0]?.phone, converted[0]?.mobilePhone);
 assert.equal(converted[0]?.mobilePhone, "01012345678");
 assert.equal(converted[0]?.packageQuantity, 1);
-assert.equal(converted[0]?.deliveryMessage, "문 앞");
+assert.equal(converted[0]?.deliveryMessage, "문 앞 / 선물포장");
 assert.equal(needsReview(converted[0]!), false);
 assert.equal(needsReview(converted[1]!), true);
 assert.equal(converted[1]?.phone, "");
 assert.equal(converted[1]?.mobilePhone, "");
 assert.equal(converted[1]?.deliveryMessage, DEFAULT_DELIVERY_MESSAGE);
+assert.equal(combineMeatboxDeliveryMessage("문 앞에 놓아주세요", "선물포장"), "문 앞에 놓아주세요 / 선물포장");
+assert.equal(combineMeatboxDeliveryMessage("경비실", ""), "경비실");
+assert.equal(combineMeatboxDeliveryMessage("", "예약발송"), "예약발송");
+assert.equal(normalizeDeliveryMessage(combineMeatboxDeliveryMessage("", "")), DEFAULT_DELIVERY_MESSAGE);
+assert.equal(combineMeatboxDeliveryMessage("  문 앞  ", "  선물용  "), "문 앞 / 선물용");
+assert.equal(combineMeatboxDeliveryMessage("문 앞", "문 앞"), "문 앞");
 
 const labeledMeatboxWorkbook = XLSX.utils.book_new();
 XLSX.utils.book_append_sheet(labeledMeatboxWorkbook, XLSX.utils.aoa_to_sheet([
-  ["상품번호", "상품명", "계근중량", "받는사람", "받는사람연락처", "배송지 주소"],
-  [285058, "염소 앞다리", "12.30kg", "수취인", "01012345678", "서울시"],
-  [" 285055 ", "염소 앞다리", "12.30kg", "수취인", "01012345678", "서울시"],
-  [217548, "염소 앞다리", "12.30kg", "수취인", "01012345678", "서울시"],
-  [999999, "염소 앞다리", "12.30kg", "수취인", "01012345678", "서울시"],
+  ["상품번호", "상품명", "계근중량", "받는사람", "받는사람연락처", "배송지 주소", "출고예정일자"],
+  [285058, "염소 앞다리", "12.30kg", "수취인", "01012345678", "서울시", localToday],
+  [" 285055 ", "염소 앞다리", "12.30kg", "수취인", "01012345678", "서울시", localToday],
+  [217548, "염소 앞다리", "12.30kg", "수취인", "01012345678", "서울시", localToday],
+  [999999, "염소 앞다리", "12.30kg", "수취인", "01012345678", "서울시", localToday],
 ]), "orders");
 const labeledRows = parseMeatboxWorkbook(labeledMeatboxWorkbook).map(({ row }) => convertMeatboxRowToHanjinRow(row));
 assert.deepEqual(labeledRows.map((row) => row.productName), [
   "염소 앞다리 (박피) 12.30kg", "염소 앞다리 (암) 12.30kg", "염소 앞다리 (수) 12.30kg", "염소 앞다리 12.30kg",
 ]);
+
+for (const value of ["2026-08-28", "2026.08.28", "2026/08/28", "2026-08-28 00:00:00", "2026-08-28 14:30:00", new Date(2026, 7, 28), 46262]) assert.equal(normalizeExcelDate(value), "2026-08-28");
+for (const value of ["", " ", null, undefined, "not-a-date", "2026-02-30"]) assert.equal(normalizeExcelDate(value), null);
+const filteredWorkbook = XLSX.utils.book_new();
+XLSX.utils.book_append_sheet(filteredWorkbook, XLSX.utils.aoa_to_sheet([
+  ["상품명", "받는사람", "받는사람연락처", "배송지 주소", "출고예정일자"],
+  ["A", "가", "0101", "서울", "2026-08-28"], ["B", "나", "0102", "서울", "2026.08.29"],
+  ["C", "다", "0103", "서울", "2026/08/28"], ["D", "라", "0104", "서울", ""],
+]), "orders");
+const filtered = parseMeatboxWorkbookWithShippingDateFilter(filteredWorkbook, new Date(2026, 7, 28));
+assert.deepEqual(filtered.rows.map(({ row }) => row.productName), ["A", "C"]);
+assert.deepEqual(filtered.report, { today: "2026-08-28", includedCount: 2, excludedCount: 2, invalidDateCount: 1, excludedDateCounts: { "2026-08-29": 1 } });
 
 const output = createHanjinWorkbook(converted);
 const sheet = output.Sheets["한진택배"]!;
@@ -141,7 +160,7 @@ assert.equal(data[1]?.[6], "");
 assert.equal(data[1]?.[7], "");
 assert.equal(data[1]?.[8], "[호주] 염소갈비 10.25kg");
 assert.equal(data[1]?.[9], "");
-assert.equal(data[1]?.[10], "문 앞");
+assert.equal(data[1]?.[10], "문 앞 / 선물포장");
 
 const roundTrip = XLSX.read(XLSX.write(output, { type: "buffer", bookType: "xlsx" }), { type: "buffer" });
 const roundTripData = XLSX.utils.sheet_to_json<Array<string | number>>(roundTrip.Sheets["한진택배"]!, { header: 1, raw: true, defval: "" });
