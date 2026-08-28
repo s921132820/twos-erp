@@ -1,13 +1,13 @@
 "use client";
 
-import { startTransition, useActionState, useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { startTransition, useActionState, useCallback, useEffect, useMemo, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import type { ImportLivestockHistory, Prisma } from "@prisma/client";
 import { Plus, Search, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { createImportHistory, deleteImportHistory, updateImportHistory } from "@/app/products/import-history-actions";
+import { createImportHistory, updateImportHistory } from "@/app/products/import-history-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { initialImportHistoryFormState } from "@/lib/validations/import-livestock-history";
@@ -15,6 +15,10 @@ import { supportsAnimalTraceLookup } from "@/lib/products/is-goat-product";
 import { requiresImportTraceNumber } from "@/lib/products/import-trace-requirement";
 
 export type ProductWithImportHistories = Prisma.ProductGetPayload<{ include: { importLivestockHistories: true } }>;
+
+function dateOnly(value: Date | null): string {
+  return value?.toISOString().slice(0, 10) || "-";
+}
 
 function FieldError({ messages }: { messages?: string[] }) {
   return messages?.[0] ? <p className="mt-1 text-xs text-red-600">{messages[0]}</p> : null;
@@ -126,7 +130,6 @@ export function ImportHistoryManager({ product }: { product: ProductWithImportHi
   const [editing, setEditing] = useState<ImportLivestockHistory>();
   const [open, setOpen] = useState(false);
   const [dirty, setDirty] = useState(false);
-  const [deleting, startDelete] = useTransition();
   const router = useRouter();
   const close = useCallback(() => { setOpen(false); setEditing(undefined); setDirty(false); }, []);
   const requestClose = useCallback(() => {
@@ -134,17 +137,10 @@ export function ImportHistoryManager({ product }: { product: ProductWithImportHi
     close();
   }, [close, dirty]);
   const complete = useCallback((message: string) => { close(); toast.success(message); router.refresh(); }, [close, router]);
-  const remove = (history: ImportLivestockHistory) => {
-    if (!window.confirm(`‘${history.historyNumber || history.billOfLadingNumber || "선택한"}’ 이력을 삭제할까요?`)) return;
-    startDelete(async () => {
-      const result = await deleteImportHistory(history.id);
-      if (result.success) toast.success(result.message);
-      else toast.error(result.message);
-    });
-  };
+  const openCreate = () => { setEditing(undefined); setDirty(false); setOpen(true); };
 
-  return <div className="space-y-5">
-    <div className="flex justify-end"><Button onClick={() => { setEditing(undefined); setDirty(false); setOpen(true); }}><Plus size={16} />이력 추가</Button></div>
+  return <div className="space-y-4">
+    <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="text-base font-bold text-slate-900">수입축산물 이력 <span className="ml-1 text-sm font-medium text-slate-500">{product.importLivestockHistories.length}건</span></h3><p className="mt-1 text-sm text-slate-500">핵심 이력을 확인하고 이력번호를 선택해 상세정보와 라벨 출력을 확인할 수 있습니다.</p></div><Button onClick={openCreate}><Plus size={16} />이력 추가</Button></div>
     <Dialog.Root open={open} onOpenChange={(nextOpen) => { if (!nextOpen) requestClose(); }}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-slate-950/45" />
@@ -156,25 +152,23 @@ export function ImportHistoryManager({ product }: { product: ProductWithImportHi
       </Dialog.Portal>
     </Dialog.Root>
     {product.importLivestockHistories.length === 0 ? (
-      <div className="flex min-h-56 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white text-sm text-slate-500">등록된 수입축산물 이력이 없습니다.</div>
+      <div className="flex min-h-56 flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white px-6 text-center"><p className="font-semibold text-slate-700">등록된 수입축산물 이력이 없습니다.</p><p className="mt-1 text-sm text-slate-500">이 제품에 사용할 수입이력을 추가해 주세요.</p><Button className="mt-4" onClick={openCreate}><Plus size={16} />이력 추가</Button></div>
     ) : (
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white"><table className="w-full min-w-[2400px] text-left text-sm">
-        <thead className="bg-slate-50 text-xs font-semibold text-slate-500"><tr>{["이력번호", "수입일", "원산지", "공급업체", "품목명", "B/L 번호", "수출업체", "해외 도축장", "해외 가공장", "부위명/부위코드", "해외 도축일", "소비기한", "사용 여부", "관리"].map((item) => <th key={item} className="whitespace-nowrap px-5 py-3.5">{item}</th>)}</tr></thead>
+      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white"><table className="w-full min-w-[1050px] text-left text-sm">
+        <thead className="bg-slate-50 text-xs font-semibold text-slate-500"><tr>{["이력번호", "원산지", "해외 작업장/업체", "품목명", "수입일", "소비기한", "상태", "관리"].map((item) => <th key={item} className="whitespace-nowrap px-4 py-3.5">{item}</th>)}</tr></thead>
         <tbody className="divide-y divide-slate-100">{product.importLivestockHistories.map((history) => <tr key={history.id}>
-          <td className="whitespace-nowrap px-5 py-4"><Link href={`/products/${encodeURIComponent(product.id)}/histories/${history.id}`} className="font-bold text-blue-700 underline-offset-4 hover:underline">{history.historyNumber || `이력 #${history.id}`}</Link></td>
-          <td className="whitespace-nowrap px-5 py-4 text-slate-600">{history.importDate ? new Intl.DateTimeFormat("ko-KR").format(history.importDate) : "-"}</td>
-          <td className="px-5 py-4 text-slate-600">{history.countryOfOrigin || "-"}</td>
-          <td className="px-5 py-4 text-slate-600">{history.supplierName || "-"}</td>
-          <td className="px-5 py-4 text-slate-600">{history.itemName || "-"}</td>
-          <td className="px-5 py-4 text-slate-600">{history.billOfLadingNumber || "-"}</td>
-          <td className="px-5 py-4 text-slate-600">{history.exporterName || "-"}</td>
-          <td className="min-w-56 whitespace-pre-wrap px-5 py-4 text-slate-600">{history.foreignSlaughterhouse || "-"}</td>
-          <td className="min-w-56 whitespace-pre-wrap px-5 py-4 text-slate-600">{history.foreignProcessingPlant || "-"}</td>
-          <td className="px-5 py-4 text-slate-600">{history.partNameCode || "-"}</td>
-          <td className="whitespace-nowrap px-5 py-4 text-slate-600">{history.foreignSlaughterDate ? new Intl.DateTimeFormat("ko-KR").format(history.foreignSlaughterDate) : "-"}</td>
-          <td className="whitespace-nowrap px-5 py-4 text-slate-600">{history.expirationDate ? new Intl.DateTimeFormat("ko-KR").format(history.expirationDate) : "-"}</td>
-          <td className="px-5 py-4"><span className={history.isActive ? "rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700" : "rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-500"}>{history.isActive ? "사용" : "미사용"}</span></td>
-          <td className="whitespace-nowrap px-5 py-4"><Button size="sm" variant="ghost" onClick={() => { setEditing(history); setDirty(false); setOpen(true); }}>수정</Button><Button size="sm" variant="ghost" className="text-red-600" disabled={deleting} onClick={() => remove(history)}>삭제</Button></td>
+          <td className="whitespace-nowrap px-4 py-4"><Link href={`/products/${encodeURIComponent(product.id)}/histories/${history.id}`} className="font-medium text-blue-700 underline-offset-4 hover:underline">{history.historyNumber || `이력 #${history.id}`}</Link></td>
+          <td className="px-4 py-4 text-slate-600">{history.countryOfOrigin || "-"}</td>
+          <td className="min-w-[220px] max-w-[300px] px-4 py-4 align-top"><div className="space-y-1.5 text-xs leading-5 text-slate-700">
+            <div className="grid grid-cols-[52px_minmax(0,1fr)] gap-2"><span className="text-slate-400">도축장</span><span className="break-words">{history.foreignSlaughterhouse || "-"}</span></div>
+            <div className="grid grid-cols-[52px_minmax(0,1fr)] gap-2"><span className="text-slate-400">가공장</span><span className="break-words">{history.foreignProcessingPlant || "-"}</span></div>
+            <div className="grid grid-cols-[52px_minmax(0,1fr)] gap-2"><span className="text-slate-400">수출업체</span><span className="break-words">{history.exporterName || "-"}</span></div>
+          </div></td>
+          <td className="max-w-64 truncate px-4 py-4 text-slate-600" title={history.itemName || undefined}>{history.itemName || "-"}</td>
+          <td className="whitespace-nowrap px-4 py-4 text-slate-600">{dateOnly(history.importDate)}</td>
+          <td className="whitespace-nowrap px-4 py-4"><div className="space-y-1"><div className="font-medium text-slate-700">{dateOnly(history.expirationDate)}</div><div className="text-xs text-slate-400">도축일 · {dateOnly(history.foreignSlaughterDate)}</div></div></td>
+          <td className="px-4 py-4"><span className={history.isActive ? "inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700" : "inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500"}>{history.isActive ? "사용중" : "미사용"}</span></td>
+          <td className="whitespace-nowrap px-4 py-4"><Button size="sm" variant="ghost" onClick={() => { setEditing(history); setDirty(false); setOpen(true); }}>수정</Button></td>
         </tr>)}</tbody>
       </table></div>
     )}

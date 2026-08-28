@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronRight, ClipboardList } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { ImportHistoryManager } from "@/components/products/import-history-manager";
 import { getProductWithImportHistories } from "@/lib/products/queries";
 
@@ -31,8 +31,7 @@ export default async function ProductDetailPage({ params }: { params: PageParams
       <h3 id="product-info-title" className="mb-5 text-base font-bold text-slate-900">제품 기본정보</h3>
       <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">{details.map(([label, value], index) => <div key={label} className={index === details.length - 1 ? "sm:col-span-2 lg:col-span-4" : ""}><dt className="text-xs font-semibold text-slate-500">{label}</dt><dd className="mt-1 whitespace-pre-wrap text-sm font-medium text-slate-900">{value}</dd></div>)}</dl>
     </section>
-    <section aria-labelledby="history-title">
-      <div className="mb-4 flex items-center justify-between"><div><h3 id="history-title" className="flex items-center gap-2 text-base font-bold text-slate-900"><ClipboardList size={18} />수입축산물 이력</h3><p className="mt-1 text-sm text-slate-500">이력을 추가·수정하거나 이력번호를 선택해 상세정보와 라벨 출력을 확인할 수 있습니다.</p></div><span className="text-sm text-slate-600">총 {product.importLivestockHistories.length}건</span></div>
+    <section aria-label="수입축산물 이력">
       <ImportHistoryManager product={product} />
     </section>
   </div>;
