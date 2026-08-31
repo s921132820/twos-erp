@@ -3,7 +3,7 @@
 import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { createProductRecord } from "@/lib/products/mutations";
+import { createProductRecord, ProductIdAllocationError } from "@/lib/products/mutations";
 import { productSchema, type ProductFormState } from "@/lib/validations/product";
 
 function formValue(formData: FormData) {
@@ -19,8 +19,13 @@ function formValue(formData: FormData) {
 }
 
 function databaseError(error: unknown): ProductFormState {
+  if (error instanceof ProductIdAllocationError) {
+    console.error("Product ID allocation failed", error);
+    return { status: "error", message: error.message };
+  }
   if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-    return { status: "error", message: "제품 ID를 생성하지 못했습니다. 잠시 후 다시 시도해 주세요." };
+    console.error("Product unique constraint violation", error);
+    return { status: "error", message: "이미 등록된 제품 정보와 중복됩니다." };
   }
   console.error("Product database operation failed", error);
   return { status: "error", message: "처리 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요." };
