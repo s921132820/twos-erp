@@ -16,22 +16,15 @@ export function prepareProductSummaryExportRows(rows: ProductSummaryExportRow[])
   return [...merged.values()];
 }
 
-export function createProductSummaryWorkbook(rows: ProductSummaryExportRow[]): XLSX.WorkBook {
+export function createProductSummaryWorksheet(rows: ProductSummaryExportRow[]): XLSX.WorkSheet {
   const prepared = prepareProductSummaryExportRows(rows);
   const data: Array<Array<string | number>> = prepared.map((row, index) => [index + 1, protectExcelText(row.productName), row.quantity]);
   const worksheet = XLSX.utils.aoa_to_sheet([["번호", "물품명", "개수"], ...data]);
   const productNameWidth = Math.min(80, Math.max(20, ...prepared.map((row) => row.productName.length + 4)));
   worksheet["!cols"] = [{ wch: 8 }, { wch: productNameWidth }, { wch: 12 }];
-  const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, worksheet, "물품별 집계"); return workbook;
+  return worksheet;
 }
 
-export function formatLocalDateForFileName(date = new Date()): string {
-  return `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, "0")}${String(date.getDate()).padStart(2, "0")}`;
-}
-
-export function getProductSummaryFileName(date = new Date()): string { return `물품별 집계_${formatLocalDateForFileName(date)}.xlsx`; }
-
-export function exportProductSummaryExcel(rows: ProductSummaryExportRow[], date = new Date()): void {
-  const prepared = prepareProductSummaryExportRows(rows); if (!prepared.length) return;
-  XLSX.writeFile(createProductSummaryWorkbook(prepared), getProductSummaryFileName(date), { compression: true });
+export function createProductSummaryWorkbook(rows: ProductSummaryExportRow[]): XLSX.WorkBook {
+  const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, createProductSummaryWorksheet(rows), "물품별 집계"); return workbook;
 }

@@ -18,7 +18,8 @@ import { formatLocalDate, normalizeDeliveryMessage, normalizeExcelDate } from ".
 import { createInitialManualForm, createManualShippingRow, normalizePackageQuantity } from "../lib/shipping/manual-shipping";
 import { groupShippingRowsByProduct, normalizeProductNameForGrouping } from "../lib/shipping/product-summary";
 import { commitProductSummaryName, createEditableProductSummaries, normalizeSummaryQuantity } from "../lib/shipping/editable-product-summary";
-import { createProductSummaryWorkbook, getProductSummaryFileName, prepareProductSummaryExportRows } from "../lib/shipping/export-product-summary";
+import { createProductSummaryWorkbook, prepareProductSummaryExportRows } from "../lib/shipping/export-product-summary";
+import { createIntegratedShippingWorkbook, getIntegratedShippingFileName } from "../lib/shipping/export-integrated-excel";
 
 assert.equal(combineProductNameAndWeight("돈삼겹살", "10.35kg"), "돈삼겹살 10.35kg");
 assert.equal(combineProductNameAndWeight("돈삼겹살", ""), "돈삼겹살");
@@ -87,7 +88,6 @@ const summaryData = XLSX.utils.sheet_to_json<Array<string | number>>(summaryWork
 assert.deepEqual(summaryData, [["번호", "물품명", "개수"], [1, "LA갈비", 5], [2, "안심", 0]]);
 assert.equal(typeof summaryData[1]?.[0], "number");
 assert.equal(typeof summaryData[1]?.[2], "number");
-assert.equal(getProductSummaryFileName(new Date(2026, 6, 29)), "물품별 집계_20260729.xlsx");
 
 const input = XLSX.utils.book_new();
 const localToday = formatLocalDate(new Date());
@@ -167,6 +167,16 @@ const roundTripData = XLSX.utils.sheet_to_json<Array<string | number>>(roundTrip
 assert.equal(roundTripData[1]?.[1], "01234");
 assert.equal(roundTripData[1]?.[4], "01012345678");
 assert.equal(roundTripData[1]?.[5], 1);
+
+const integrated = createIntegratedShippingWorkbook(converted, preparedSummaryExport);
+assert.deepEqual(integrated.SheetNames, ["한진택배 통합", "물품별 집계"]);
+const integratedHanjinData = XLSX.utils.sheet_to_json<Array<string | number>>(integrated.Sheets["한진택배 통합"]!, { header: 1, raw: true, defval: "" });
+const integratedSummaryData = XLSX.utils.sheet_to_json<Array<string | number>>(integrated.Sheets["물품별 집계"]!, { header: 1, raw: true, defval: "" });
+assert.deepEqual(integratedHanjinData, data);
+assert.deepEqual(integratedSummaryData, summaryData);
+assert.equal(getIntegratedShippingFileName(new Date(2026, 8, 4)), "택배송장_2026-09-04.xlsx");
+const integratedRoundTrip = XLSX.read(XLSX.write(integrated, { type: "buffer", bookType: "xlsx" }), { type: "buffer" });
+assert.deepEqual(integratedRoundTrip.SheetNames, ["한진택배 통합", "물품별 집계"]);
 
 assert.equal(joinAddressParts(" 경기도  광주시 ", " 101동\n202호 "), "경기도 광주시 101동 202호");
 assert.equal(joinAddressParts("경기도 광주시", ""), "경기도 광주시");
