@@ -3,7 +3,7 @@
 import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { createClientRecord } from "@/lib/clients/mutations";
+import { ClientIdAllocationError, createClientRecord } from "@/lib/clients/mutations";
 import { clientSchema, type ClientFormState } from "@/lib/validations/client";
 
 const optional = (value: FormDataEntryValue | null) => String(value ?? "").trim() || null;
@@ -21,17 +21,30 @@ const values = (formData: FormData) => ({
 
 export async function createClient(_previous: ClientFormState, formData: FormData): Promise<ClientFormState> {
   const parsed = clientSchema.safeParse(values(formData));
-  if (!parsed.success) return { status: "error", message: "입력 내용을 확인해 주세요.", errors: parsed.error.flatten().fieldErrors };
+  if (!parsed.success) {
+    const errors = parsed.error.flatten().fieldErrors;
+    const message = Object.values(errors).flat()[0] ?? "입력 내용을 확인해 주세요.";
+    return { status: "error", message, errors };
+  }
   try {
     const client = await createClientRecord(parsed.data);
     revalidatePath("/clients");
     return { status: "success", message: "거래처를 등록했습니다.", clientId: client.id };
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      return { status: "error", message: "거래처 ID가 중복되었습니다. 잠시 후 다시 시도해 주세요." };
+    if (error instanceof ClientIdAllocationError) {
+      console.error("[CLIENT_ID_ALLOCATION_ERROR]", { name: error.name, message: error.message });
+      return { status: "error", message: "거래처 ID를 생성하지 못했습니다. 잠시 후 다시 시도해 주세요." };
     }
-    console.error("Client create failed", error);
-    return { status: "error", message: "거래처를 등록하지 못했습니다." };
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      console.error("[CLIENT_CREATE_ERROR]", { code: error.code, message: error.message, meta: error.meta });
+      return { status: "error", message: "이미 등록된 거래처입니다." };
+    }
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      console.error("[CLIENT_CREATE_ERROR]", { code: error.code, message: error.message, meta: error.meta });
+    } else {
+      console.error("[CLIENT_CREATE_ERROR]", error);
+    }
+    return { status: "error", message: "거래처 저장 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요." };
   }
 }
 
