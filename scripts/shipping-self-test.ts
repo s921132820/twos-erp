@@ -94,7 +94,7 @@ const localToday = formatLocalDate(new Date());
 XLSX.utils.book_append_sheet(input, XLSX.utils.aoa_to_sheet([["안내"]]), "안내");
 XLSX.utils.book_append_sheet(input, XLSX.utils.aoa_to_sheet([
   ["미트박스 주문현황"],
-  ["상품명", "계근중량", "받는사람", "받는사람연락처", "우편번호", "배송지 주소", "배송메세지", "비고", "출고예정일자"],
+  ["상품명", "계근중량", "받는사람", "받는사람연락처", "우편번호", "배송지 주소", "배송시주의사항", "비고", "출고예정일자"],
   ["[호주] 염소갈비", "10.25kg", "홍길동", "01012345678", "01234", "서울시", "문 앞", "선물포장", localToday],
   ["상품만", "", "", "", "", "주소", "", "", localToday],
   ["상품3", "9.5", "김철수", "01099998888", "12345", "부산시", "", "", localToday],
@@ -118,10 +118,53 @@ assert.equal(converted[1]?.mobilePhone, "");
 assert.equal(converted[1]?.deliveryMessage, DEFAULT_DELIVERY_MESSAGE);
 assert.equal(combineMeatboxDeliveryMessage("문 앞에 놓아주세요", "선물포장"), "문 앞에 놓아주세요 / 선물포장");
 assert.equal(combineMeatboxDeliveryMessage("경비실", ""), "경비실");
-assert.equal(combineMeatboxDeliveryMessage("", "예약발송"), "예약발송");
+assert.equal(combineMeatboxDeliveryMessage("", "예약발송"), "배송 후 연락바랍니다 / 예약발송");
 assert.equal(normalizeDeliveryMessage(combineMeatboxDeliveryMessage("", "")), DEFAULT_DELIVERY_MESSAGE);
 assert.equal(combineMeatboxDeliveryMessage("  문 앞  ", "  선물용  "), "문 앞 / 선물용");
 assert.equal(combineMeatboxDeliveryMessage("문 앞", "문 앞"), "문 앞");
+for (const emptySender of ["", "N", "n", " N ", " n ", null, undefined, "   "]) {
+  assert.equal(combineMeatboxDeliveryMessage("문 앞", "", emptySender), "문 앞");
+  assert.equal(combineMeatboxDeliveryMessage("문 앞", "선물용", emptySender), "문 앞 / 선물용");
+  assert.equal(normalizeDeliveryMessage(combineMeatboxDeliveryMessage("", "", emptySender)), DEFAULT_DELIVERY_MESSAGE);
+}
+assert.equal(combineMeatboxDeliveryMessage("", "", " Nancy "), "배송 후 연락바랍니다 / 보내는분: Nancy");
+for (const emptyNotice of ["", "   ", null, undefined]) {
+  assert.equal(combineMeatboxDeliveryMessage(emptyNotice, "냉동상품", "홍길동"), "배송 후 연락바랍니다 / 냉동상품 / 보내는분: 홍길동");
+}
+
+const giftMessageCases = [
+  ["문 앞", "선물포장", "홍길동", "문 앞 / 선물포장 / 보내는분: 홍길동"],
+  ["경비실", "", "홍길동", "경비실 / 보내는분: 홍길동"],
+  ["", "", "홍길동", "배송 후 연락바랍니다 / 보내는분: 홍길동"],
+  ["", "냉동상품", "홍길동", "배송 후 연락바랍니다 / 냉동상품 / 보내는분: 홍길동"],
+  ["   ", "냉동상품", "홍길동", "배송 후 연락바랍니다 / 냉동상품 / 보내는분: 홍길동"],
+  ["문 앞", "선물용", "", "문 앞 / 선물용"],
+  ["", "", "", DEFAULT_DELIVERY_MESSAGE],
+  ["", "선물용", "이영희", "배송 후 연락바랍니다 / 선물용 / 보내는분: 이영희"],
+  ["  문 앞  ", "  선물용  ", "  홍길동  ", "문 앞 / 선물용 / 보내는분: 홍길동"],
+  ["문 앞", "", "   ", "문 앞"],
+  ["문 앞", "문 앞", "홍길동", "문 앞 / 보내는분: 홍길동"],
+  ["문 앞", "", "N", "문 앞"],
+  ["문 앞", "선물용", " N ", "문 앞 / 선물용"],
+  ["문 앞", "", "n", "문 앞"],
+  ["문 앞", "", " n ", "문 앞"],
+  ["", "", "N", DEFAULT_DELIVERY_MESSAGE],
+] as const;
+const giftWorkbook = XLSX.utils.book_new();
+XLSX.utils.book_append_sheet(giftWorkbook, XLSX.utils.aoa_to_sheet([
+  ["상품명", "받는사람", "받는사람연락처", "배송지 주소", "출고예정일자", " 배송시주의사항 ", "비고", " 선물하기 보내는분 ", "배송메세지"],
+  ...giftMessageCases.map(([message, note, sender]) => ["상품", "수취인", "01012345678", "서울시", localToday, message, note, sender, "사용하면 안 되는 기존 컬럼"]),
+  ["다른 상품", "수취인", "01012345678", "서울시", localToday, "문 앞", "선물포장", "홍길동"],
+  ["제외 상품", "수취인", "01012345678", "서울시", "2000-01-01", "", "", "제외 보내는분"],
+]), "주문");
+const giftRows = parseMarketplaceExcel(XLSX.write(giftWorkbook, { type: "array", bookType: "xlsx" }), "meatbox", "gift.xlsx");
+assert.deepEqual(giftRows.map((row) => row.deliveryMessage), [...giftMessageCases.map(([, , , expected]) => expected), giftMessageCases[0][3]]);
+const giftOutput = createHanjinWorkbook(giftRows);
+const giftData = XLSX.utils.sheet_to_json<Array<string | number>>(giftOutput.Sheets["한진택배"]!, { header: 1, raw: true, defval: "" });
+assert.deepEqual(giftData[0], HANJIN_HEADERS);
+assert.ok(giftData.every((row) => row.length === 12));
+assert.deepEqual(giftData.slice(1).map((row) => row[10]), giftRows.map((row) => row.deliveryMessage));
+assert.equal(parsed[0]?.row.giftSender, "");
 
 const labeledMeatboxWorkbook = XLSX.utils.book_new();
 XLSX.utils.book_append_sheet(labeledMeatboxWorkbook, XLSX.utils.aoa_to_sheet([

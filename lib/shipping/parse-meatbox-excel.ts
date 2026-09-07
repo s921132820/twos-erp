@@ -3,7 +3,7 @@ import { cellDisplayValue, formatLocalDate, normalizeExcelDate, normalizeHeader,
 import type { MeatboxOrderRow, MeatboxShippingDateFilterReport, ParsedOrderRow } from "./types";
 
 const REQUIRED_HEADERS = ["상품명", "받는사람", "받는사람연락처", "배송지 주소"] as const;
-const ALL_HEADERS = [...REQUIRED_HEADERS, "상품번호", "계근중량", "우편번호", "배송메세지", "비고", "출고예정일자"] as const;
+const ALL_HEADERS = [...REQUIRED_HEADERS, "상품번호", "계근중량", "우편번호", "배송시주의사항", "비고", "선물하기 보내는분", "출고예정일자"] as const;
 type Header = (typeof ALL_HEADERS)[number];
 
 function findHeaderRow(sheet: XLSX.WorkSheet): { row: number; columns: Map<Header, number> } | null {
@@ -45,8 +45,9 @@ export function parseMeatboxWorkbookWithShippingDateFilter(workbook: XLSX.WorkBo
         receiverContact: toIdentifierString(value("받는사람연락처")),
         postalCode: toIdentifierString(value("우편번호")),
         shippingAddress: toSafeString(value("배송지 주소")),
-        deliveryMessage: toSafeString(value("배송메세지")),
+        deliveryMessage: toSafeString(value("배송시주의사항")),
         note: toSafeString(value("비고")),
+        giftSender: toSafeString(value("선물하기 보내는분")),
       };
       if (![row.productName, row.receiverName, row.receiverContact, row.shippingAddress].some(Boolean)) continue;
       const dateColumn = header.columns.get("출고예정일자");

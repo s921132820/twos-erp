@@ -16,6 +16,7 @@ export type MeatboxOrderRow = {
   shippingAddress: string;
   deliveryMessage: string;
   note: string;
+  giftSender: string;
 };
 
 export type CoupangWingOrderRow = {
