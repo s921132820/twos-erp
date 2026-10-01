@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { createImportHistory, updateImportHistory } from "@/app/products/import-history-actions";
 import { Button } from "@/components/ui/button";
+import { DeleteImportHistoryButton } from "./delete-import-history-button";
 import { Input } from "@/components/ui/input";
 import { initialImportHistoryFormState } from "@/lib/validations/import-livestock-history";
 import { supportsAnimalTraceLookup } from "@/lib/products/is-goat-product";
@@ -168,7 +169,7 @@ export function ImportHistoryManager({ product }: { product: ProductWithImportHi
           <td className="whitespace-nowrap px-4 py-4 text-slate-600">{dateOnly(history.importDate)}</td>
           <td className="whitespace-nowrap px-4 py-4"><div className="space-y-1"><div className="font-medium text-slate-700">{dateOnly(history.expirationDate)}</div><div className="text-xs text-slate-400">도축일 · {dateOnly(history.foreignSlaughterDate)}</div></div></td>
           <td className="px-4 py-4"><span className={history.isActive ? "inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700" : "inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500"}>{history.isActive ? "사용중" : "미사용"}</span></td>
-          <td className="whitespace-nowrap px-4 py-4"><Button size="sm" variant="ghost" onClick={() => { setEditing(history); setDirty(false); setOpen(true); }}>수정</Button></td>
+          <td className="whitespace-nowrap px-4 py-4"><div className="flex items-center gap-1"><Button size="sm" variant="ghost" onClick={() => { setEditing(history); setDirty(false); setOpen(true); }}>수정</Button><DeleteImportHistoryButton id={history.id} historyNumber={history.historyNumber} itemName={history.itemName} /></div></td>
         </tr>)}</tbody>
       </table></div>
     )}

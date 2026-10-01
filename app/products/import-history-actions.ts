@@ -44,6 +44,14 @@ function historyOperationError(
     error,
   });
 
+  if (context.operation === "delete") {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === "P2025") return { status: "error", message: "이미 삭제되었거나 존재하지 않는 이력입니다." };
+      if (error.code === "P2003") return { status: "error", message: "다른 데이터에서 참조 중인 이력은 삭제할 수 없습니다." };
+    }
+    return { status: "error", message: `수입축산물 이력을 삭제하지 못했습니다. (오류번호: ${errorId})` };
+  }
+
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === "P2002") return { status: "error", message: "이미 등록된 수입축산물 이력번호입니다.", errors: { historyNumber: ["다른 이력번호를 입력해 주세요."] } };
     if (error.code === "P2003") return { status: "error", message: "연결할 제품을 찾을 수 없습니다." };
@@ -154,7 +162,7 @@ export async function updateImportHistory(id: number, _previous: ImportHistoryFo
 }
 
 export async function deleteImportHistory(id: number): Promise<{ success: boolean; message: string }> {
-  if (!Number.isInteger(id) || id < 1) return { success: false, message: "삭제할 이력 정보가 올바르지 않습니다." };
+  if (!Number.isSafeInteger(id) || id < 1 || id > 2147483647) return { success: false, message: "삭제할 이력 정보가 올바르지 않습니다." };
   try {
     const deleted = await prisma.importLivestockHistory.delete({ where: { id }, select: { productId: true } });
     revalidateImportHistoryPaths(deleted.productId);
